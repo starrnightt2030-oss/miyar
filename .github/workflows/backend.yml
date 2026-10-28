@@ -17,6 +17,8 @@ jobs:
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       REF: ${{ secrets.SUPABASE_PROJECT_REF }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - name: التحقق من الأسرار
         run: |
@@ -41,9 +43,13 @@ jobs:
             KEYS=$(npx --yes web-push@3.6.7 generate-vapid-keys --json)
             supabase secrets set --project-ref "$REF" VAPID_PUBLIC="$(echo "$KEYS" | jq -r .publicKey)" VAPID_PRIVATE="$(echo "$KEYS" | jq -r .privateKey)"
           fi
-      - name: مفتاح Claude على الخادم
+      - name: مفاتيح الذكاء الاصطناعي على الخادم (أي واحد أو أكثر)
         run: |
-          if [ -n "$ANTHROPIC_API_KEY" ]; then supabase secrets set --project-ref "$REF" ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"; else echo "::warning::لم يُضف ANTHROPIC_API_KEY — التوليد من الصور لن يعمل عبر الخادم"; fi
+          n=0
+          if [ -n "$ANTHROPIC_API_KEY" ]; then supabase secrets set --project-ref "$REF" ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"; n=$((n+1)); fi
+          if [ -n "$OPENAI_API_KEY" ]; then supabase secrets set --project-ref "$REF" OPENAI_API_KEY="$OPENAI_API_KEY"; n=$((n+1)); fi
+          if [ -n "$GEMINI_API_KEY" ]; then supabase secrets set --project-ref "$REF" GEMINI_API_KEY="$GEMINI_API_KEY"; n=$((n+1)); fi
+          [ "$n" = "0" ] && echo "::warning::لم يُضف أي مفتاح ذكاء اصطناعي — التوليد عبر الخادم لن يعمل (يمكن إضافة مفتاح على كل جهاز من الإعدادات)" || echo "مفاتيح مضبوطة: $n"
       - name: إعداد الدخول (بدون رسالة تأكيد — موافقة المدير تكفي)
         run: |
           SITE="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"

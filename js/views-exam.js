@@ -125,7 +125,7 @@
         var proceed = function () {
           Promise.all(res.exams.map(function (e) { return M.save('exams', e, { log: false }); })).then(function () {
             M.log('توليد نماذج', st.meta.title, n(res.exams.length) + ' نموذج — مادة ' + (sub.name || ''));
-            M.toast('تم توليد ' + n(res.exams.length) + ' نموذج', 'ok');
+            M.notifyDone('اكتمل توليد النماذج', n(res.exams.length) + ' نموذج جاهز للمراجعة'); M.toast('تم توليد ' + n(res.exams.length) + ' نموذج');
             M.go('#/exam/' + res.exams[0].id);
           });
         };

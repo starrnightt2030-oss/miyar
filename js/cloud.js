@@ -90,7 +90,7 @@
     return C.client.functions.invoke(fn, { body: body }).then(function (r) {
       if (r.error) {
         var ctx = r.error.context;
-        if (ctx && ctx.json) return ctx.json().then(function (j) { throw new Error(j.error || (j.error && j.error.message) || r.error.message); }, function () { throw r.error; });
+        if (ctx && ctx.json) return ctx.json().then(function (j) { var e = j && j.error; throw new Error((typeof e === 'string' ? e : e && e.message) || r.error.message); }, function () { throw r.error; });
         throw r.error;
       }
       return r.data;
@@ -101,6 +101,7 @@
   var timer = null, chan = null, profChan = null;
   function start() {
     setStatus(navigator.onLine ? 'syncing' : 'offline');
+    fetch(C.cfg.url + '/functions/v1/generate').then(function (r) { return r.json(); }).then(function (j) { C.aiProviders = j.providers || []; }).catch(function () {});
     C.sync().then(function () { subscribe(); });
     clearInterval(timer);
     timer = setInterval(function () { if (navigator.onLine) C.sync(); }, 60 * 1000);
@@ -233,14 +234,14 @@
     }).subscribe();
     if (C.profile.role === 'admin') {
       profChan = C.client.channel('profiles-live').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, function (p) {
-        M.chime(); M.toast('طلب حساب جديد: ' + ((p.new && p.new.name) || '') + ' — راجع صفحة الأونلاين');
+        M.sound('notify'); M.toast('طلب حساب جديد: ' + ((p.new && p.new.name) || '') + ' — راجع صفحة الأونلاين');
       }).subscribe();
     }
   }
   function watchProfile() {
     if (profChan) return;
     profChan = C.client.channel('me-live').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: 'id=eq.' + C.user.id }, function () {
-      loadProfile().then(function (p) { if (p.approved) { M.chime(); M.toast('تمت الموافقة على حسابك — بدأت المزامنة', 'ok'); C.client.removeChannel(profChan); profChan = null; start(); M.render(); } });
+      loadProfile().then(function (p) { if (p.approved) { M.sound('notify'); M.toast('تمت الموافقة على حسابك — بدأت المزامنة', 'ok'); C.client.removeChannel(profChan); profChan = null; start(); M.render(); } });
     }).subscribe();
   }
 
@@ -319,7 +320,7 @@
       if (!e.data || e.data.type !== 'PUSH') return;
       var d = e.data.data || {};
       if (d.kind === 'update') { M.checkUpdate(); return; }
-      M.chime(); M.toast(d.title + (d.body ? ' — ' + d.body : ''));
+      M.sound('notify'); M.toast(d.title + (d.body ? ' — ' + d.body : ''));
       syncSoon();
     });
   }
@@ -413,8 +414,8 @@
       C.client.from('ai_usage').select('model,input_tokens,output_tokens').gte('at', month.toISOString())
     ]).then(function (r) {
       var users = r[0].data || [], usage = r[1].data || [];
-      var PRICE = { 'claude-sonnet-5-5': [2, 10], 'claude-opus-5-5': [4, 20] };
-      var cost = usage.reduce(function (s, u) { var p = PRICE[u.model] || [4, 20]; return s + (u.input_tokens * p[0] + u.output_tokens * p[1]) / 1e6; }, 0);
+      var byModel = {};
+      usage.forEach(function (u) { var k = u.model || '—'; byModel[k] = byModel[k] || { n: 0, t: 0 }; byModel[k].n++; byModel[k].t += (u.input_tokens || 0) + (u.output_tokens || 0); });
       var pend = users.filter(function (u) { return !u.approved; }).length;
       var box = M.qs('#cl-admin', main); if (!box) return;
       box.innerHTML = '<div class="card flat"><div style="padding:14px 16px"><h2>الحسابات ' + (pend ? '<span class="chip warn">' + n(pend) + ' بانتظار الموافقة</span>' : '') + '</h2></div><div class="scroll-x"><table class="tbl"><thead><tr><th>الاسم</th><th>البريد</th><th>الدور</th><th>الحالة</th><th></th></tr></thead><tbody>' +
@@ -424,7 +425,7 @@
             '<td>' + (u.approved ? '<span class="chip ok">معتمد</span>' : '<span class="chip warn">ينتظر</span>') + '</td><td>' + (self ? '' : '<button class="btn sm' + (u.approved ? '' : ' pri') + '" data-uapp="' + u.id + '" data-v="' + (u.approved ? '0' : '1') + '">' + (u.approved ? 'إيقاف' : 'موافقة') + '</button>') + '</td></tr>';
         }).join('') + '</tbody></table></div></div>' +
         '<div class="card"><h2 style="margin-bottom:10px">إشعار فوري لكل المستخدمين</h2><div class="grid2"><div class="field"><label for="bc-t">العنوان</label><input id="bc-t" class="inp" placeholder="مثال: آخر موعد لتسليم بنوك الأسئلة"></div><div class="field"><label for="bc-b">النص</label><input id="bc-b" class="inp"></div></div><div class="row" style="margin-top:10px"><button class="btn pri" id="bc-go">' + I('send') + ' إرسال الآن</button></div></div>' +
-        '<div class="card"><h2 style="margin-bottom:6px">استخدام الذكاء الاصطناعي هذا الشهر</h2><div class="small muted">' + n(usage.length) + ' طلب · ' + n(usage.reduce(function (s, u) { return s + u.input_tokens + u.output_tokens; }, 0).toLocaleString('en')) + ' توكن · تكلفة تقديرية ' + n(cost.toFixed(2)) + ' دولار</div></div>';
+        '<div class="card"><h2 style="margin-bottom:6px">استخدام الذكاء الاصطناعي هذا الشهر</h2>' + (usage.length ? '<table class="tbl"><thead><tr><th>المزود والنموذج</th><th>الطلبات</th><th>التوكنز</th></tr></thead><tbody>' + Object.keys(byModel).map(function (k) { return '<tr><td class="p-code">' + esc(k) + '</td><td>' + n(byModel[k].n) + '</td><td>' + n(byModel[k].t.toLocaleString('en')) + '</td></tr>'; }).join('') + '</tbody></table><div class="small muted">التكلفة الفعلية تظهر في لوحة حساب المزود.</div>' : '<div class="small muted">لا يوجد استخدام هذا الشهر.</div>') + '</div>';
       M.qsa('[data-uapp]', box).forEach(function (b) {
         b.onclick = function () {
           var approve = b.dataset.v === '1', u = users.find(function (x) { return x.id === b.dataset.uapp; });

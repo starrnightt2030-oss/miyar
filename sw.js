@@ -1,5 +1,5 @@
 /* معيار — Service Worker (مولَّد تلقائياً بواسطة tools/release.js — لا تعدّله يدوياً) */
-var VERSION = '1.2.0';
+var VERSION = '1.3.0';
 var CACHE = 'miyar-' + VERSION;
 var FILES = [
   "./config.json",
@@ -32,9 +32,11 @@ var FILES = [
   "./js/draw.js",
   "./js/exchange.js",
   "./js/generator.js",
+  "./js/install.js",
   "./js/math.js",
   "./js/paper.js",
   "./js/safety.js",
+  "./js/sound.js",
   "./js/store.js",
   "./js/update.js",
   "./js/util.js",

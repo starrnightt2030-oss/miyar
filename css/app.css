@@ -189,6 +189,11 @@ textarea.inp{min-height:80px;resize:vertical;line-height:1.7}
 .cloud-dot.offline,.cloud-dot.pending,.cloud-dot.out{background:#D97706}
 .cloud-dot.error{background:#B91C1C}
 
+.install-sheet{position:fixed;inset-inline:0;bottom:0;display:flex;justify-content:center;padding:12px 12px calc(12px + env(safe-area-inset-bottom));z-index:70;pointer-events:none}
+.install-card{pointer-events:auto;background:#fff;border-radius:18px;box-shadow:0 -6px 40px rgba(23,33,58,.28);padding:16px;width:min(520px,100%);animation:slideup .35s ease-out;border:1px solid var(--line)}
+@keyframes slideup{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+@media (max-width:900px){.install-sheet{bottom:64px}}
+
 /* setup */
 .setup{max-width:560px;margin:6vh auto;padding:16px}
 .role-pick{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}

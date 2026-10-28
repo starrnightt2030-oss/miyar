@@ -54,6 +54,7 @@
   M.render = function () {
     var r = M.route();
     var app = document.getElementById('app');
+    if (!app) return;
     if (!S.settings.setupDone) { app.innerHTML = ''; return M.views.setup(app); }
     if (M._locked) { return M.views.lock(app); }
     var view = M.views[r.name] || M.views.home;
@@ -208,8 +209,11 @@
       '<div class="row"><button class="btn" id="st-chk">' + I('download') + ' فحص التحديثات الآن</button><button class="btn" id="st-ntf">' + I('spark') + ' ' + (('Notification' in window) && Notification.permission === 'granted' ? 'الإشعارات مفعّلة — إعادة التفعيل' : 'تفعيل إشعارات التحديث') + '</button><button class="btn" id="st-snd">اختبار صوت التنبيه</button></div>' +
       '<details style="margin-top:10px"><summary class="bold" style="cursor:pointer">سجل الإصدارات</summary>' + M.changelogHTML() + '</details></div>' +
       '<div id="st-safety"></div>' +
-      '<div class="card"><h2 style="margin-bottom:6px">توليد الأسئلة بالذكاء الاصطناعي</h2><p class="small muted" style="margin:0 0 10px">الطريقة المفضلة: تسجيل الدخول للخادم الأونلاين (المفتاح محفوظ على الخادم ولا يحتاج المدرسون أي إعداد). بديل لهذا الجهاز فقط: ضع مفتاح Claude API من console.anthropic.com — التكلفة تُخصم من حسابك، والمفتاح لا يغادر هذا الجهاز ولا يدخل في الحزم أو النسخ الاحتياطية.</p>' +
-      '<div class="row"><input id="st-aik" class="inp" type="password" dir="ltr" style="max-width:420px" placeholder="sk-ant-..." value="' + esc(st.aiKey || '') + '" aria-label="مفتاح API" autocomplete="off"><button class="btn" id="st-aiks">حفظ المفتاح</button>' + (st.aiKey ? '<button class="btn danger" id="st-aikd">حذف المفتاح</button>' : '') + '</div></div>' +
+      M.aiSettingsHTML() +
+      '<div class="card"><h2 style="margin-bottom:6px">الأصوات والتنبيهات</h2><p class="small muted" style="margin:0 0 10px">صوت مميز لكل مرحلة: الحفظ، والإرسال للمراجعة، والاعتماد، والإعادة بملاحظة، والأخطاء، واكتمال المهام الطويلة (التوليد والتصدير)، ووصول الإشعارات. صوت التحديث الإجباري يعمل دائماً.</p>' +
+      '<div class="row"><label class="check"><input type="checkbox" id="snd-on"' + (st.soundOn !== false ? ' checked' : '') + '> تشغيل الأصوات</label><label class="small">مستوى الصوت <input type="range" id="snd-vol" min="0.05" max="0.8" step="0.05" value="' + (st.soundVol == null ? 0.3 : st.soundVol) + '"></label></div>' +
+      '<div class="row" style="gap:6px;margin-top:8px">' + Object.keys(M.SOUND_LABELS).map(function (k) { return '<button class="btn sm" data-sndt="' + k + '">▶ ' + M.SOUND_LABELS[k] + '</button>'; }).join('') + '</div>' +
+      (M.canInstall() ? '<div class="row" style="margin-top:12px"><button class="btn pri" id="st-install">' + I('download') + ' تثبيت التطبيق على هذا الجهاز</button></div>' : (M.isStandalone() ? '<div class="small muted" style="margin-top:10px">✓ التطبيق مثبت على هذا الجهاز.</div>' : '')) + '</div>' +
       '<div class="card"><div class="card-h"><h2 class="grow">بيانات المركز (تظهر في ترويسة كل المخرجات)</h2>' + (admin ? '' : '<span class="chip">يعدّلها مدير النظام</span>') + '</div>' +
       '<div class="row" style="align-items:flex-start">' +
       '<div style="display:flex;flex-direction:column;gap:8px;align-items:center"><div class="p-logo' + (cen.logo ? ' has' : '') + '" id="st-logo" style="width:90px;height:90px">' + (cen.logo ? '<img src="' + cen.logo + '" alt="الشعار">' : 'لا يوجد شعار') + '</div>' +
@@ -257,8 +261,11 @@
       if (newRole !== me.role) M.log('تغيير الدور', name, M.ROLES[me.role] + ' ← ' + M.ROLES[newRole]);
       Promise.all(jobs).then(function () { M.toast('تم حفظ الإعدادات', 'ok'); M.render(); });
     };
-    M.qs('#st-aiks', main).onclick = function () { var v = M.qs('#st-aik', main).value.trim(); if (v && !/^sk-ant-/.test(v)) return M.toast('المفتاح يبدأ بـ sk-ant-', 'bad'); M.setSetting('aiKey', v).then(function () { M.toast(v ? 'تم حفظ المفتاح على هذا الجهاز' : 'تم الحذف', 'ok'); M.render(); }); };
-    var aikd = M.qs('#st-aikd', main); if (aikd) aikd.onclick = function () { M.setSetting('aiKey', '').then(M.render); };
+    M.bindAISettings(main);
+    M.qs('#snd-on', main).onchange = function (e) { M.setSetting('soundOn', e.target.checked); if (e.target.checked) M.sound('success', true); };
+    M.qs('#snd-vol', main).onchange = function (e) { M.setSetting('soundVol', Number(e.target.value)).then(function () { M.sound('notify', true); }); };
+    M.qsa('[data-sndt]', main).forEach(function (b) { b.onclick = function () { M.sound(b.dataset.sndt, true); }; });
+    var ins = M.qs('#st-install', main); if (ins) ins.onclick = function () { M.offerInstall(true); };
     M.qs('#st-chk', main).onclick = function () { M.checkUpdate(true); };
     M.qs('#st-ntf', main).onclick = function () { M.enableUpdateNotifications().then(function () { M.render(); }); };
     M.qs('#st-snd', main).onclick = function () { M.chime(); };

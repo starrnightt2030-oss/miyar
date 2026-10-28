@@ -19,22 +19,27 @@
 3. بعد ما المشروع يجهز، افتح **Project Settings ← General** وانسخ **Reference ID** (حروف مثل `abcdxyzqwerty`).
 4. من صورتك أعلى يمين الصفحة: **Account ← Access Tokens ← Generate new token**، سمّه `github`، **وانسخه**.
 
-## ٢. مفتاح Claude (لتوليد الأسئلة من الصور)
+## ٢. مفتاح ذكاء اصطناعي (لتوليد الأسئلة من صور الدرس)
 
-1. ادخل على **console.anthropic.com** ← **API Keys** ← **Create Key**، **وانسخه** (يبدأ بـ `sk-ant-`).
-2. من **Billing** أضف رصيداً (مثلاً ٥ أو ١٠ دولار).
+1. يكفي مفتاح واحد من أي مزود — أو أكثر:
+   - **Claude:** console.anthropic.com ← API Keys (يبدأ بـ `sk-ant-`)
+   - **ChatGPT:** platform.openai.com ← API keys (يبدأ بـ `sk-`)
+   - **Gemini:** aistudio.google.com ← Get API key (يبدأ بـ `AIza`) — له حصة مجانية محدودة
+2. أضف رصيداً من صفحة Billing عند المزود (Claude وChatGPT).
 3. **التكلفة التقريبية:** حوالي ٠٫٣ دولار لتوليد أسئلة درس من ٦ صفحات بأربعة أنواع (Sonnet)، وحوالي الضعف مع Opus. لوحة الأونلاين عند المدير تعرض الاستهلاك الشهري.
 
 ## ٣. إضافة الأسرار في GitHub
 
-في مستودع **miyar** افتح: **Settings ← Secrets and variables ← Actions ← New repository secret**، وأضف الأربعة:
+في مستودع **miyar** افتح: **Settings ← Secrets and variables ← Actions ← New repository secret**، وأضف الثلاثة الأولى + مفتاح ذكاء اصطناعي واحد على الأقل:
 
 | الاسم (Name) | القيمة (Secret) |
 | --- | --- |
 | `SUPABASE_PROJECT_REF` | الـ Reference ID من الخطوة ١ |
 | `SUPABASE_DB_PASSWORD` | كلمة مرور قاعدة البيانات من الخطوة ١ |
 | `SUPABASE_ACCESS_TOKEN` | الـ Access Token من الخطوة ١ |
-| `ANTHROPIC_API_KEY` | مفتاح Claude من الخطوة ٢ |
+| `ANTHROPIC_API_KEY` | مفتاح Claude (اختياري) |
+| `OPENAI_API_KEY` | مفتاح ChatGPT (اختياري) |
+| `GEMINI_API_KEY` | مفتاح Gemini (اختياري) |
 
 ## ٤. تشغيل التجهيز
 
@@ -77,7 +82,7 @@
   - المدرس يعدّل ما أنشأه فقط.
   - رئيس القسم والمدير يعدّلان الكل.
   - وثائق الجودة يعدّلها المدير فقط.
-- مفتاح Claude ومفاتيح الإشعارات محفوظة على الخادم، ولا تصل لأي جهاز.
+- مفاتيح الذكاء الاصطناعي ومفاتيح الإشعارات محفوظة على الخادم، ولا تصل لأي جهاز.
 - التطبيق يظل يعمل بدون إنترنت، وتُرفع التعديلات تلقائياً عند الاتصال.
 - صور صفحات الكتاب تبقى على الجهاز الذي صوّرها، ولا تُرفع للخادم إلا مؤقتاً أثناء التوليد.
 

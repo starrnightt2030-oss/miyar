@@ -206,7 +206,7 @@
         body += '<div class="card"><div class="card-h"><h3 class="grow">نواتج التعلم</h3><button class="btn sm" id="b-addo">' + I('plus', 16) + ' ناتج</button></div>' +
           (outs.length ? outs.map(function (o) { var c = S.questions.filter(function (x) { return x.outcomeId === o.id && x.status !== 'archived'; }).length; return '<div class="row" style="padding:6px 0;border-bottom:1px solid #EEF0F4;gap:10px"><span class="chip">' + esc(o.code) + '</span><span style="flex:1">' + esc(o.text) + '</span><span class="small muted">' + n(c) + ' سؤال</span><button class="btn sm ghost" data-eo="' + o.id + '">' + I('edit', 16) + '</button><button class="btn sm ghost" data-do="' + o.id + '" aria-label="حذف">' + I('trash', 16) + '</button></div>'; }).join('') : '<div class="small muted">لم تُضف نواتج تعلم بعد. ربط الأسئلة بالنواتج مطلوب لمصفوفة التغطية.</div>') + '</div>';
         body += M.lessonImagesCard(lesson);
-        body += '<div class="card"><div class="card-h"><h3 class="grow">محتوى الدرس (نص اختياري)</h3><button class="btn sm" id="b-ai">' + I('copy', 16) + ' طلب يدوي لأي مساعد ذكي</button></div>' +
+        body += '<div class="card"><div class="card-h"><h3 class="grow">محتوى الدرس (نص اختياري)</h3><button class="btn sm" id="b-ai">' + I('spark', 16) + ' توليد من النص</button></div>' +
           '<textarea id="b-content" class="inp" style="min-height:110px" placeholder="الصق هنا محتوى الدرس أو ملخصه (اختياري) — يُستخدم لاقتراح الأسئلة">' + esc(lesson.content || '') + '</textarea>' +
           '<div class="row" style="margin-top:8px"><button class="btn sm" id="b-savec">حفظ المحتوى</button></div></div>';
         body += '<div class="card"><h3 style="margin-bottom:10px">أضف سؤالاً على هذا الدرس</h3><div class="types">' +
@@ -254,7 +254,7 @@
     });
     if (lesson) M.bindLessonImages(main, lesson);
     on('b-savec', function () { lesson.content = M.qs('#b-content', main).value; M.save('lessons', lesson).then(function () { M.toast('تم حفظ المحتوى', 'ok'); }); });
-    on('b-ai', function () { lesson.content = M.qs('#b-content', main).value; M.save('lessons', lesson, { log: false }); M.aiDialog(lesson); });
+    on('b-ai', function () { lesson.content = M.qs('#b-content', main).value; M.save('lessons', lesson, { log: false }); M.aiDialog2(lesson); });
     on('b-xl', function () { M.exportBankExcel(shown, 'بنك-' + (lesson ? lesson.name : unit ? unit.name : subject.name)); });
     on('b-wd', function () { M.exportBankWord(shown, 'بنك أسئلة ' + (lesson ? lesson.name : unit ? unit.name : 'مادة ' + subject.name)); });
     on('b-imp', function () {

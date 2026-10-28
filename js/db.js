@@ -1,7 +1,7 @@
 /* طبقة التخزين — IndexedDB على الجهاز */
 (function (M) {
   'use strict';
-  var DB_NAME = 'miyar', DB_VER = 2;
+  var DB_NAME = 'miyar', DB_VER = 3;
   M.STORES = ['subjects', 'units', 'lessons', 'outcomes', 'questions', 'exams', 'docs', 'log', 'packs'];
   var dbp = null, memory = null;
 
@@ -16,6 +16,7 @@
         if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings', { keyPath: 'key' });
         M.STORES.forEach(function (s) { if (!db.objectStoreNames.contains(s)) db.createObjectStore(s, { keyPath: 'id' }); });
         if (!db.objectStoreNames.contains('snapshots')) db.createObjectStore('snapshots', { keyPath: 'id' });
+        if (!db.objectStoreNames.contains('conflicts')) db.createObjectStore('conflicts', { keyPath: 'id' });
       };
       req.onsuccess = function () { resolve(req.result); };
       req.onerror = function () { memory = {}; resolve(null); };

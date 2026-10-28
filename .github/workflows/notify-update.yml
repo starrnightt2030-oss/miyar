@@ -1,0 +1,40 @@
+# إشعار فوري لكل الأجهزة عند نشر إصدار جديد (تغيّر version.json)
+name: إشعار التحديث الجديد
+on:
+  push:
+    branches: [main]
+    paths: ['version.json']
+  workflow_dispatch:
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: التحقق من الإعداد
+        id: chk
+        run: if [ -z "$REF" ] || [ -z "$SUPABASE_ACCESS_TOKEN" ]; then echo "skip=1" >> "$GITHUB_OUTPUT"; echo "::notice::الخادم غير مُعدّ — تخطي الإشعار"; fi
+      - uses: supabase/setup-cli@v1
+        if: steps.chk.outputs.skip != '1'
+        with:
+          version: latest
+      - name: انتظار نشر الإصدار على GitHub Pages
+        if: steps.chk.outputs.skip != '1'
+        run: |
+          V=$(jq -r .version version.json)
+          URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/version.json"
+          for i in $(seq 1 40); do
+            LIVE=$(curl -s -H 'Cache-Control: no-cache' "$URL?t=$(date +%s)" | jq -r .version 2>/dev/null || true)
+            [ "$LIVE" = "$V" ] && { echo "الإصدار $V منشور"; break; }
+            sleep 15
+          done
+      - name: إرسال الإشعار لكل الأجهزة
+        if: steps.chk.outputs.skip != '1'
+        run: |
+          SVC=$(supabase projects api-keys --project-ref "$REF" -o json | jq -r '(first(.[] | select(.name=="service_role") | .api_key)) // (first(.[] | select(.type=="secret") | .api_key))')
+          V=$(jq -r .version version.json)
+          BODY=$(jq -n --arg v "$V" --arg n "$(jq -r '.notes[0] // "افتح التطبيق للتحديث الآن"' version.json)" \
+            '{all:true, kind:"update", tag:"miyar-update", title:("تحديث جديد لمعيار — الإصدار " + $v), body:$n, url:"./index.html"}')
+          curl -sS -X POST "https://$REF.supabase.co/functions/v1/notify" -H "Authorization: Bearer $SVC" -H "Content-Type: application/json" -d "$BODY"

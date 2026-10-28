@@ -29,6 +29,7 @@
     ];
     if (r !== 'teacher') items.push({ k: 'review', label: 'المراجعة والاعتماد', icon: 'review', cnt: pend });
     items.push(r === 'admin' ? { k: 'merge', label: 'تجميع الحزم', icon: 'merge' } : { k: 'merge', label: 'إرسال للأدمن', icon: 'send' });
+    items.push({ k: 'cloud', label: 'الأونلاين والإشعارات', icon: 'spark' });
     items.push({ k: 'docs', label: 'وثائق الجودة', icon: 'docs' });
     items.push({ k: 'settings', label: 'الإعدادات', icon: 'settings' });
     return items;
@@ -40,12 +41,12 @@
     var nav = items.map(function (it) {
       return '<a href="#/' + it.k + '" class="' + (it.k === active ? 'on' : '') + '">' + I(it.icon) + '<span>' + it.label + '</span>' + (it.cnt ? '<span class="cnt">' + n(it.cnt) + '</span>' : '') + '</a>';
     }).join('');
-    var mob = items.filter(function (it) { return ['home', 'bank', 'exams', 'merge', 'settings'].indexOf(it.k) >= 0; }).map(function (it) {
-      return '<a href="#/' + it.k + '" class="' + (it.k === active ? 'on' : '') + '">' + I(it.icon, 22) + '<span>' + (it.k === 'merge' ? (M.role() === 'admin' ? 'التجميع' : 'إرسال') : it.label.split(' ')[0]) + '</span></a>';
+    var mob = items.filter(function (it) { return ['home', 'bank', 'exams', 'cloud', 'settings'].indexOf(it.k) >= 0; }).map(function (it) {
+      return '<a href="#/' + it.k + '" class="' + (it.k === active ? 'on' : '') + '">' + I(it.icon, 22) + '<span>' + (it.k === 'cloud' ? 'الأونلاين' : it.label.split(' ')[0]) + '</span></a>';
     }).join('');
     return '<div class="app"><aside class="side"><div class="brand"><div class="brand-mark">' + I('exam', 20) + '</div><div><b>معيار</b><span>بنك الأسئلة والامتحانات</span></div></div>' +
       '<nav class="nav" aria-label="القائمة الرئيسية">' + nav + '</nav>' +
-      '<div class="side-foot"><div class="avatar">' + esc((me.name || '؟').trim().charAt(0)) + '</div><div style="min-width:0"><div class="bold" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(me.name || '') + '</div><div class="small muted">' + esc(M.ROLES[M.role()]) + ' · <span class="p-code">v' + esc(M.VERSION) + '</span></div></div></div></aside>' +
+      '<div class="side-foot"><div class="avatar">' + esc((me.name || '؟').trim().charAt(0)) + '</div><div style="min-width:0"><div class="bold" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(me.name || '') + '</div><div class="small muted">' + esc(M.ROLES[M.role()]) + ' · <span class="p-code">v' + esc(M.VERSION) + '</span></div></div><a href="#/cloud" id="cloud-dot" class="cloud-dot ' + ((M.cloud && M.cloud.status) || 'off') + '" title="' + esc(M.cloud && M.cloud.statusLabel ? M.cloud.statusLabel() : '') + '" aria-label="حالة الأونلاين"></a></div></aside>' +
       '<div class="main" id="main"></div><nav class="mnav" aria-label="التنقل">' + mob + '</nav></div>';
   }
 
@@ -155,7 +156,7 @@
     var recent = S.log.slice(0, 8).map(function (e) { return '<tr><td class="small muted" style="white-space:nowrap">' + n(M.fmtDate(e.at, true)) + '</td><td>' + esc(e.action) + '</td><td>' + esc(e.target) + '</td><td class="small muted">' + esc(e.by) + '</td></tr>'; }).join('');
     main.innerHTML = M.topbar('أهلاً، ' + esc(me.name || ''), esc(M.ROLES[M.role()]) + (S.settings.center.name ? ' · ' + esc(S.settings.center.name) : ''),
       '<a class="btn" href="#/bank">' + I('plus') + ' سؤال جديد</a><a class="btn pri" href="#/gen">' + I('spark') + ' توليد نماذج استرشادية</a>') +
-      '<div class="content">' + M.safetyBanner() + '<div id="h-folderbar"></div>' +
+      '<div class="content">' + (M.cloud && M.cloud.ready && !M.cloud.user ? '<div class="alert info">' + I('spark') + '<div style="flex:1">الخادم الأونلاين جاهز — سجّل الدخول لمزامنة عملك لحظياً مع باقي الأجهزة وتلقي الإشعارات الفورية.</div><a class="btn sm" href="#/cloud">تسجيل الدخول</a></div>' : '') + M.safetyBanner() + '<div id="h-folderbar"></div>' +
       (!M.db.persistent() ? '<div class="alert bad">' + I('warn') + '<div>المتصفح لا يسمح بالحفظ الدائم في هذا الوضع (مثل التصفح الخاص) — البيانات ستضيع عند الإغلاق.</div></div>' : '') +
       (days > 7 && S.questions.length ? '<div class="alert warn">' + I('warn') + '<div style="flex:1">' + (lastB ? 'آخر نسخة احتياطية منذ ' + n(Math.floor(days)) + ' يوماً.' : 'لم تُؤخذ نسخة احتياطية بعد.') + ' خذ نسخة الآن واحفظها خارج الجهاز.</div><button class="btn sm" id="h-backup">نسخة احتياطية</button></div>' : '') +
       '<div class="grid4">' +
@@ -201,11 +202,14 @@
     var st = S.settings, cen = st.center || {}, me = M.me(), admin = M.can('center');
     var t = st.levelTargets || [30, 40, 20, 10];
     main.innerHTML = M.topbar('الإعدادات', 'الإصدار ' + n(M.VERSION)) + '<div class="content">' +
+      '<div class="row mob-only"><a class="btn" href="#/merge">' + I(M.role() === 'admin' ? 'merge' : 'send') + ' ' + (M.role() === 'admin' ? 'تجميع الحزم' : 'إرسال حزمة للأدمن') + '</a><a class="btn" href="#/docs">' + I('docs') + ' وثائق الجودة</a>' + (M.role() !== 'teacher' ? '<a class="btn" href="#/review">' + I('review') + ' المراجعة</a>' : '') + '</div>' +
       '<div class="card"><div class="card-h"><h2 class="grow">الإصدار والتحديثات</h2><span class="chip ok">الإصدار <span class="p-code">' + esc(M.VERSION) + '</span></span></div>' +
       '<div class="small muted" style="margin-bottom:10px">التحديثات إجبارية: عند نشر إصدار جديد يظهر تنبيه صوتي ونافذة تحديث فوراً عند فتح التطبيق أو أثناء استخدامه (يُفحص كل ٣ دقائق)، ومع تفعيل الإشعارات يصلك إشعار حتى والتطبيق مغلق.' + (st.lastUpdateCheck ? ' آخر فحص: ' + n(M.fmtDate(st.lastUpdateCheck, true)) : '') + '</div>' +
       '<div class="row"><button class="btn" id="st-chk">' + I('download') + ' فحص التحديثات الآن</button><button class="btn" id="st-ntf">' + I('spark') + ' ' + (('Notification' in window) && Notification.permission === 'granted' ? 'الإشعارات مفعّلة — إعادة التفعيل' : 'تفعيل إشعارات التحديث') + '</button><button class="btn" id="st-snd">اختبار صوت التنبيه</button></div>' +
       '<details style="margin-top:10px"><summary class="bold" style="cursor:pointer">سجل الإصدارات</summary>' + M.changelogHTML() + '</details></div>' +
       '<div id="st-safety"></div>' +
+      '<div class="card"><h2 style="margin-bottom:6px">توليد الأسئلة بالذكاء الاصطناعي</h2><p class="small muted" style="margin:0 0 10px">الطريقة المفضلة: تسجيل الدخول للخادم الأونلاين (المفتاح محفوظ على الخادم ولا يحتاج المدرسون أي إعداد). بديل لهذا الجهاز فقط: ضع مفتاح Claude API من console.anthropic.com — التكلفة تُخصم من حسابك، والمفتاح لا يغادر هذا الجهاز ولا يدخل في الحزم أو النسخ الاحتياطية.</p>' +
+      '<div class="row"><input id="st-aik" class="inp" type="password" dir="ltr" style="max-width:420px" placeholder="sk-ant-..." value="' + esc(st.aiKey || '') + '" aria-label="مفتاح API" autocomplete="off"><button class="btn" id="st-aiks">حفظ المفتاح</button>' + (st.aiKey ? '<button class="btn danger" id="st-aikd">حذف المفتاح</button>' : '') + '</div></div>' +
       '<div class="card"><div class="card-h"><h2 class="grow">بيانات المركز (تظهر في ترويسة كل المخرجات)</h2>' + (admin ? '' : '<span class="chip">يعدّلها مدير النظام</span>') + '</div>' +
       '<div class="row" style="align-items:flex-start">' +
       '<div style="display:flex;flex-direction:column;gap:8px;align-items:center"><div class="p-logo' + (cen.logo ? ' has' : '') + '" id="st-logo" style="width:90px;height:90px">' + (cen.logo ? '<img src="' + cen.logo + '" alt="الشعار">' : 'لا يوجد شعار') + '</div>' +
@@ -253,6 +257,8 @@
       if (newRole !== me.role) M.log('تغيير الدور', name, M.ROLES[me.role] + ' ← ' + M.ROLES[newRole]);
       Promise.all(jobs).then(function () { M.toast('تم حفظ الإعدادات', 'ok'); M.render(); });
     };
+    M.qs('#st-aiks', main).onclick = function () { var v = M.qs('#st-aik', main).value.trim(); if (v && !/^sk-ant-/.test(v)) return M.toast('المفتاح يبدأ بـ sk-ant-', 'bad'); M.setSetting('aiKey', v).then(function () { M.toast(v ? 'تم حفظ المفتاح على هذا الجهاز' : 'تم الحذف', 'ok'); M.render(); }); };
+    var aikd = M.qs('#st-aikd', main); if (aikd) aikd.onclick = function () { M.setSetting('aiKey', '').then(M.render); };
     M.qs('#st-chk', main).onclick = function () { M.checkUpdate(true); };
     M.qs('#st-ntf', main).onclick = function () { M.enableUpdateNotifications().then(function () { M.render(); }); };
     M.qs('#st-snd', main).onclick = function () { M.chime(); };
@@ -279,6 +285,7 @@
       M.render();
       M.ensurePersist();
       M.startUpdates();
+      if (M.cloud) M.cloud.init().then(function () { M.refreshNav(); var r = M.route(); if (r.name === 'cloud' || r.name === 'home') M.render(); });
       if (S.settings.setupDone) M.afterUpdateNotice(); else M.setSetting('lastSeenVersion', M.VERSION);
     }).catch(function (e) {
       document.getElementById('app').innerHTML = '<div class="setup"><div class="alert bad">تعذّر فتح قاعدة البيانات: ' + esc(e.message) + '</div></div>';

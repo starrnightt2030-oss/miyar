@@ -11,7 +11,7 @@ const files = [];
 (function walk(d) {
   for (const f of fs.readdirSync(path.join(root, d))) {
     const rel = d ? d + '/' + f : f;
-    if (/^(\.|tools|sw\.js$|version\.json$|README|node_modules)/.test(rel) || /\.(md|bat|zip)$/.test(f)) continue;
+    if (/^(\.|tools|supabase|sw\.js$|version\.json$|README|SETUP|node_modules)/.test(rel) || /\.(md|bat|zip|toml|sql|ts)$/.test(f)) continue;
     if (fs.statSync(path.join(root, rel)).isDirectory()) walk(rel); else files.push('./' + rel);
   }
 })('');
@@ -39,6 +39,7 @@ self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') return;
   var url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
+  if (url.pathname.endsWith('/config.json')) { e.respondWith(fetch(e.request, { cache: 'no-store' }).catch(function () { return caches.match('./config.json'); })); return; }
   if (url.pathname.endsWith('/version.json')) { e.respondWith(fetch(e.request, { cache: 'no-store' }).catch(function () { return new Response('{}', { headers: { 'Content-Type': 'application/json' } }); })); return; }
   e.respondWith(caches.open(CACHE).then(function (c) {
     return c.match(e.request, { ignoreSearch: true }).then(function (hit) {
@@ -62,12 +63,26 @@ function checkAndNotify() {
     });
   }).catch(function () {});
 }
+/* الإشعارات الفورية من الخادم (Web Push) */
+self.addEventListener('push', function (e) {
+  var d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (x) { d = { title: 'معيار', body: e.data ? e.data.text() : '' }; }
+  var isUpdate = d.kind === 'update';
+  e.waitUntil(Promise.all([
+    self.registration.showNotification(d.title || 'معيار', {
+      body: d.body || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: d.tag || 'miyar', renotify: true,
+      requireInteraction: isUpdate, vibrate: isUpdate ? [250, 120, 250, 120, 400] : [200, 100, 200], data: { url: d.url || './index.html' }
+    }),
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (cl) { cl.forEach(function (c) { c.postMessage({ type: 'PUSH', data: d }); }); })
+  ]));
+});
 self.addEventListener('periodicsync', function (e) { if (e.tag === 'miyar-update-check') e.waitUntil(checkAndNotify()); });
 self.addEventListener('notificationclick', function (e) {
   e.notification.close();
+  var url = (e.notification.data && e.notification.data.url) || './index.html';
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (cl) {
-    for (var i = 0; i < cl.length; i++) if ('focus' in cl[i]) return cl[i].focus();
-    return self.clients.openWindow('./index.html');
+    for (var i = 0; i < cl.length; i++) if ('focus' in cl[i]) { if (url.indexOf('#') >= 0 && cl[i].navigate) cl[i].navigate(url).catch(function () {}); return cl[i].focus(); }
+    return self.clients.openWindow(url);
   }));
 });
 `;

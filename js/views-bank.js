@@ -205,7 +205,8 @@
         var outs = M.outcomesOf(lesson.id);
         body += '<div class="card"><div class="card-h"><h3 class="grow">نواتج التعلم</h3><button class="btn sm" id="b-addo">' + I('plus', 16) + ' ناتج</button></div>' +
           (outs.length ? outs.map(function (o) { var c = S.questions.filter(function (x) { return x.outcomeId === o.id && x.status !== 'archived'; }).length; return '<div class="row" style="padding:6px 0;border-bottom:1px solid #EEF0F4;gap:10px"><span class="chip">' + esc(o.code) + '</span><span style="flex:1">' + esc(o.text) + '</span><span class="small muted">' + n(c) + ' سؤال</span><button class="btn sm ghost" data-eo="' + o.id + '">' + I('edit', 16) + '</button><button class="btn sm ghost" data-do="' + o.id + '" aria-label="حذف">' + I('trash', 16) + '</button></div>'; }).join('') : '<div class="small muted">لم تُضف نواتج تعلم بعد. ربط الأسئلة بالنواتج مطلوب لمصفوفة التغطية.</div>') + '</div>';
-        body += '<div class="card"><div class="card-h"><h3 class="grow">محتوى الدرس</h3><button class="btn sm" id="b-ai">' + I('spark', 16) + ' اقترح أسئلة من المحتوى</button></div>' +
+        body += M.lessonImagesCard(lesson);
+        body += '<div class="card"><div class="card-h"><h3 class="grow">محتوى الدرس (نص اختياري)</h3><button class="btn sm" id="b-ai">' + I('copy', 16) + ' طلب يدوي لأي مساعد ذكي</button></div>' +
           '<textarea id="b-content" class="inp" style="min-height:110px" placeholder="الصق هنا محتوى الدرس أو ملخصه (اختياري) — يُستخدم لاقتراح الأسئلة">' + esc(lesson.content || '') + '</textarea>' +
           '<div class="row" style="margin-top:8px"><button class="btn sm" id="b-savec">حفظ المحتوى</button></div></div>';
         body += '<div class="card"><h3 style="margin-bottom:10px">أضف سؤالاً على هذا الدرس</h3><div class="types">' +
@@ -251,6 +252,7 @@
         M.confirm('حذف ناتج التعلم', 'حذف «' + o.code + '»؟', 'حذف', true).then(function (ok) { if (ok) M.remove('outcomes', o.id).then(M.render); });
       };
     });
+    if (lesson) M.bindLessonImages(main, lesson);
     on('b-savec', function () { lesson.content = M.qs('#b-content', main).value; M.save('lessons', lesson).then(function () { M.toast('تم حفظ المحتوى', 'ok'); }); });
     on('b-ai', function () { lesson.content = M.qs('#b-content', main).value; M.save('lessons', lesson, { log: false }); M.aiDialog(lesson); });
     on('b-xl', function () { M.exportBankExcel(shown, 'بنك-' + (lesson ? lesson.name : unit ? unit.name : subject.name)); });
@@ -389,6 +391,7 @@
         '<div class="card" style="display:flex;flex-direction:column;gap:10px"><div class="row"><h3 style="flex:1">شكل مرفق بالسؤال (اختياري)</h3><button type="button" class="btn sm" id="f-drawfig">' + I('t_draw', 16) + ' ' + (q.figureShapes ? 'تعديل الرسم' : 'رسم شكل') + '</button><button type="button" class="btn sm" id="f-upfig">' + I('t_image', 16) + ' رفع صورة</button>' + (q.figure ? '<button type="button" class="btn sm danger" id="f-rmfig">إزالة</button>' : '') + '</div>' +
         (q.figure ? '<div class="row" style="align-items:flex-start"><img src="' + q.figure + '" alt="الشكل" style="max-width:260px;max-height:180px;border:1px solid var(--line);border-radius:8px;background:#fff"><div class="field" style="min-width:200px"><label for="f-figw">عرض الشكل في الورقة: <span id="f-figwv">' + n(q.figureWidth || 60) + '٪</span></label><input id="f-figw" type="range" min="25" max="100" step="5" value="' + (q.figureWidth || 60) + '"></div></div>' : '<div class="small muted">ارسم شكلاً هندسياً أو مستوى إحداثياً أو خط أعداد، أو ارفع صورة؛ يظهر تحت نص السؤال في الورقة.</div>') + '</div>' +
         (q.reviewNote && q.status === 'returned' ? '<div class="alert bad">' + I('warn') + '<div>ملاحظة المراجع: ' + esc(q.reviewNote) + '</div></div>' : '') +
+        (q.evidence ? '<div class="small" style="background:#FFFBEB;border-inline-start:3px solid #D97706;padding:8px 12px;border-radius:8px"><b>الدليل من الكتاب' + (q.evidencePage ? ' (صفحة ' + n(q.evidencePage) + ')' : '') + ': </b>' + esc(q.evidence) + '</div>' : '') +
         '<div id="f-errs"></div>' +
         '<div class="row"><button class="btn pri" id="f-save">' + I('check') + ' حفظ</button><button class="btn" id="f-submit">حفظ وإرسال للمراجعة</button>' +
         (M.can('approve') ? '<button class="btn" id="f-approve">حفظ واعتماد</button>' : '') +
@@ -516,6 +519,7 @@
           '<span class="chip">' + esc((M.lessonPath(q.lessonId).lesson || {}).name || '—') + '</span><span class="chip info">' + M.LEVELS[q.level] + '</span><span class="small muted">بواسطة ' + esc(q.createdBy || q.updatedByName || '') + ' · إصدار ' + n(q.ver || 1) + '</span>' + (q.source === 'ai' ? '<span class="chip warn">مقترح آلياً — راجع الدقة العلمية</span>' : '') + '</div>' +
           '<div style="background:#E9EBF0;border-radius:10px;padding:10px">' + M.renderQuestionPreview(q, S.settings.digits) + '</div>' +
           '<div class="small"><b>الإجابة / النموذج: </b>' + M.richText(q.type === 'match' ? q.pairs.map(function (x) { return x.a + ' ← ' + x.b; }).join(' · ') : M.answerText(q), 'arabic', { answers: true }) + '</div>' +
+          (q.evidence ? '<div class="small" style="background:#FFFBEB;border-inline-start:3px solid #D97706;padding:6px 10px;border-radius:6px"><b>الدليل من الكتاب' + (q.evidencePage ? ' (صفحة ' + n(q.evidencePage) + ')' : '') + ': </b>' + esc(q.evidence) + '</div>' : '') +
           (errs.length ? '<div class="alert warn">' + I('warn') + '<div>' + errs.map(esc).join('، ') + '</div></div>' : '') +
           '<div class="row"><button class="btn pri sm" data-ok="' + q.id + '"' + (errs.length ? ' disabled' : '') + '>' + I('check', 16) + ' اعتماد</button><button class="btn sm" data-ret="' + q.id + '">إعادة بملاحظة</button><a class="btn sm" href="#/q/' + q.id + '">' + I('edit', 16) + ' تعديل</a></div></div>';
       }).join('');

@@ -1,0 +1,8 @@
+project_id = "miyar"
+
+# إعدادات دوال معيار — التحقق من المستخدم يتم داخل الدوال نفسها
+[functions.generate]
+verify_jwt = false
+
+[functions.notify]
+verify_jwt = false

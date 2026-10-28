@@ -18,9 +18,18 @@
         if (!db.objectStoreNames.contains('snapshots')) db.createObjectStore('snapshots', { keyPath: 'id' });
         if (!db.objectStoreNames.contains('conflicts')) db.createObjectStore('conflicts', { keyPath: 'id' });
       };
-      req.onsuccess = function () { resolve(req.result); };
+      req.onsuccess = function () {
+        var db = req.result;
+        /* نسخة أحدث فُتحت في تبويب آخر: نغلق القاعدة ونعيد التحميل بدل تعطيلها */
+        db.onversionchange = function () { try { db.close(); } catch (e) { /* */ } setTimeout(function () { location.reload(); }, 300); };
+        resolve(db);
+      };
       req.onerror = function () { memory = {}; resolve(null); };
-      req.onblocked = function () { M.toast('أغلق النسخ الأخرى المفتوحة من التطبيق ثم أعد التحميل', 'bad'); };
+      req.onblocked = function () {
+        window.__bootBlocked = true;
+        var a = document.getElementById('app');
+        if (a) a.innerHTML = '<div style="max-width:460px;margin:60px auto;padding:24px;border-radius:16px;background:#fff;border:1px solid #e3e6ee;font-family:sans-serif;line-height:1.8;text-align:center"><b style="font-size:18px">نسخة قديمة من «معيار» مفتوحة</b><p>أغلق أي تبويب أو نافذة أخرى للتطبيق (أو التطبيق المثبت)، وسيفتح هنا تلقائياً.</p></div>';
+      };
     });
     return dbp;
   }

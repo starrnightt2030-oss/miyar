@@ -55,6 +55,7 @@
     var r = M.route();
     var app = document.getElementById('app');
     if (!app) return;
+    window.__booted = true;
     if (!S.settings.setupDone) { app.innerHTML = ''; return M.views.setup(app); }
     if (M._locked) { return M.views.lock(app); }
     var view = M.views[r.name] || M.views.home;

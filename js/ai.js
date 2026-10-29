@@ -151,6 +151,8 @@
         if (legacy === 2) { /* بدون مخطط: نعتمد على وصف الطلب */ }
         else if (legacy === 1) gc.responseSchema = stripAP(spec.schema);
         else gc.responseJsonSchema = spec.schema;
+        /* Gemini 3: التفكير المنخفض أسرع بكثير ويكفي لصياغة الأسئلة */
+        if (/gemini-3/.test(model) && !legacy) gc.thinkingConfig = { thinkingLevel: 'low' };
         return { __model: model, systemInstruction: { parts: [{ text: spec.system }] }, contents: [{ role: 'user', parts: parts }], generationConfig: gc };
       },
       call: function (body, key) {
@@ -175,8 +177,12 @@
   };
   function pickBy(list, pats) { for (var i = 0; i < pats.length; i++) { var m = list.find(function (x) { return pats[i].test(x.id); }); if (m) return m.id; } return list[0] ? list[0].id : ''; }
 
+  var TIMEOUT = 240000; /* ٤ دقائق كحد أقصى لكل طلب */
   function post(url, headers, body) {
-    return fetch(url, { method: 'POST', headers: Object.assign({ 'content-type': 'application/json' }, headers), body: JSON.stringify(body) })
+    var ac = window.AbortController ? new AbortController() : null, tm = ac ? setTimeout(function () { ac.abort(); }, TIMEOUT) : 0;
+    return fetch(url, { method: 'POST', headers: Object.assign({ 'content-type': 'application/json' }, headers), body: JSON.stringify(body), signal: ac ? ac.signal : undefined })
+      .catch(function (e) { clearTimeout(tm); if (e && e.name === 'AbortError') { var t = new Error('TIMEOUT'); t.timeout = true; throw t; } throw e; })
+      .then(function (r) { clearTimeout(tm); return r; })
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) { var e = new Error(errMsg(j) || ('HTTP ' + r.status)); e.status = r.status; throw e; } return j; }); });
   }
   function get(url, headers) {
@@ -191,7 +197,8 @@
     if (/429|rate|quota|exceeded|RESOURCE_EXHAUSTED/i.test(m)) return 'تجاوزت الحد المسموح في الدقيقة أو اليوم — انتظر دقيقة وأعد المحاولة، أو قلّل عدد الأنواع في المرة الواحدة';
     if (/credit|billing|balance/i.test(m)) return 'رصيد الحساب غير كافٍ — أضف رصيداً من موقع المزود';
     if (/model.*(not found|does not exist)|not supported/i.test(m)) return 'النموذج المختار غير متاح لهذا المفتاح — اختر نموذجاً آخر من القائمة';
-    if (/Failed to fetch|NetworkError/i.test(m)) return 'تعذّر الاتصال — تحقق من الإنترنت';
+    if (/^TIMEOUT$/.test(m)) return 'النموذج تأخر أكثر من ٤ دقائق في الرد — قلّل عدد الصفحات أو عدد الأسئلة، أو جرّب مرة أخرى';
+    if (/Failed to fetch|NetworkError|Load failed|network/i.test(m)) return 'انقطع الاتصال أثناء الإرسال — تأكد من الإنترنت وأبقِ الشاشة مفتوحة أثناء التوليد';
     return m;
   }
   M.aiFriendly = friendly;
@@ -241,7 +248,9 @@
       var rl = e.status === 429 || e.status === 503 || /RESOURCE_EXHAUSTED|UNAVAILABLE|overloaded|rate limit/i.test(e.message);
       if (!rl || tries <= 0 || /limit: 0/.test(e.message)) throw e;
       var m = /retry in ([\d.]+)s|"retryDelay":\s*"(\d+)s/i.exec(e.message || ''), d = m ? Number(m[1] || m[2]) * 1000 : 0;
-      return wait(Math.min(Math.max(d, (4 - tries) * 8000), 65000)).then(function () { return withRetry(fn, tries - 1); });
+      var ms = Math.min(Math.max(d, (4 - tries) * 8000), 65000);
+      if (M._aiStatus) M._aiStatus('وصلنا لحد الطلبات في الدقيقة — إعادة المحاولة بعد ' + M.n(Math.round(ms / 1000)) + ' ثانية…');
+      return wait(ms).then(function () { return withRetry(fn, tries - 1); });
     });
   }
   M.aiCall = function (route, model, spec) {
@@ -250,7 +259,7 @@
   function aiCall0(route, model, spec) {
     return callOnce(route, model, spec, 0).catch(function (e) {
       /* Gemini: بعض الإصدارات لا تدعم responseJsonSchema → نجرب الصيغة الأقدم ثم بدون مخطط */
-      if (route.provider === 'gemini' && /responseJsonSchema|response_json_schema|Unknown name|Invalid JSON payload/i.test(e.message)) {
+      if (route.provider === 'gemini' && /responseJsonSchema|response_json_schema|thinking|Unknown name|Invalid JSON payload/i.test(e.message)) {
         return callOnce(route, model, spec, 1).catch(function () { return callOnce(route, model, spec, 2); });
       }
       throw e;
@@ -259,18 +268,22 @@
 
   /* طلب لكل نوع بالتوازي (أسرع ويتجنب انتهاء المهلة) */
   M.aiGenerate = function (opts, onProgress) {
-    var types = opts.types.slice(), results = [], notes = [], errors = [], done = 0, usage = { input_tokens: 0, output_tokens: 0 };
+    /* الأنواع تُجمع في دفعات (حتى ~١٨ سؤالاً لكل طلب) — الصور تُرسل مرات أقل والطلبات أقل */
+    var per = Math.max(1, Math.min(3, Math.floor(18 / Math.max(1, opts.count)))), batches = [];
+    for (var b = 0; b < opts.types.length; b += per) batches.push(opts.types.slice(b, b + per));
+    var results = [], notes = [], errors = [], done = 0, usage = { input_tokens: 0, output_tokens: 0 };
     function next() {
-      var t = types.shift(); if (!t) return Promise.resolve();
-      return M.aiCall(opts.route, opts.model, M.aiSpec(opts, [t])).then(function (r) {
-        r.questions.forEach(function (q) { if (!q.type || !M.TYPE[q.type]) q.type = t; results.push(q); });
-        if (r.notes) notes.push(M.TYPE[t].label + ': ' + r.notes);
+      var ts = batches.shift(); if (!ts) return Promise.resolve();
+      var label = ts.map(function (t) { return M.TYPE[t].label; }).join('، ');
+      return M.aiCall(opts.route, opts.model, M.aiSpec(opts, ts)).then(function (r) {
+        r.questions.forEach(function (q) { if (!q.type || !M.TYPE[q.type] || ts.indexOf(q.type) < 0) q.type = M.TYPE[q.type] ? q.type : ts[0]; results.push(q); });
+        if (r.notes) notes.push(label + ': ' + r.notes);
         usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0;
-      }).catch(function (e) { errors.push(M.TYPE[t].label + ': ' + friendly(e.message)); }).then(function () { done++; if (onProgress) onProgress(done, opts.types.length); return next(); });
+      }).catch(function (e) { errors.push(label + ': ' + friendly(e.message)); }).then(function () { done += ts.length; if (onProgress) onProgress(done, opts.types.length); return next(); });
     }
     /* Gemini المجاني حدوده في الدقيقة قليلة → طلبان متوازيان فقط */
     var par = opts.route.provider === 'gemini' ? 2 : 3;
-    var w = []; for (var i = 0; i < Math.min(par, types.length); i++) w.push(next());
+    var w = []; for (var i = 0, L = batches.length; i < Math.min(par, L); i++) w.push(next());
     return Promise.all(w).then(function () { return { questions: results, notes: notes, errors: errors, usage: usage }; });
   };
 
@@ -426,14 +439,25 @@
           var am = Object.assign({}, S.settings.aiModels || {}); am[r.provider] = model; M.setSetting('aiModels', am);
           o.route = r; o.model = model;
           go.disabled = true;
-          st.innerHTML = '<div class="alert info"><span class="pulse">' + I('spark') + '</span><div>جاري قراءة الدرس وإعداد الأسئلة عبر ' + esc(M.AI_PROVIDERS[r.provider].name) + '… <span id="g2-p2">٠ / ' + n(o.types.length) + '</span></div></div>';
+          st.innerHTML = '<div class="alert info"><span class="pulse">' + I('spark') + '</span><div style="flex:1">جاري قراءة الدرس وإعداد الأسئلة عبر ' + esc(M.AI_PROVIDERS[r.provider].name) + '… <b id="g2-p2">٠ / ' + n(o.types.length) + '</b> نوع · <span id="g2-tm" class="p-code">٠:٠٠</span>' +
+            '<div class="small" id="g2-sub">إرسال صفحات الدرس…</div><div class="small muted">أبقِ الشاشة مفتوحة والتطبيق ظاهراً حتى ينتهي (عادة ١–٣ دقائق).</div></div></div>';
+          var t0 = Date.now(), wl = null;
+          var tick = setInterval(function () {
+            var s2 = Math.floor((Date.now() - t0) / 1000), el = M.qs('#g2-tm', m); if (!el) return clearInterval(tick);
+            el.textContent = n(Math.floor(s2 / 60)) + ':' + n(String(s2 % 60).padStart(2, '0'));
+            var sub = M.qs('#g2-sub', m); if (sub && s2 === 8) sub.textContent = 'النموذج يقرأ الصفحات ويكتب الأسئلة…';
+          }, 1000);
+          try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (x) { wl = x; }).catch(function () {}); } catch (x) { /* */ }
+          M._aiStatus = function (t) { var sub = M.qs('#g2-sub', m); if (sub) sub.textContent = t; };
+          var finish = function () { clearInterval(tick); M._aiStatus = null; try { if (wl) wl.release(); } catch (x) { /* */ } };
           M.sound && M.sound('start');
-          M.aiGenerate(o, function (d, t) { var p = M.qs('#g2-p2', m); if (p) p.textContent = n(d) + ' / ' + n(t); M.sound && M.sound('tick'); }).then(function (res) {
+          M.aiGenerate(o, function (d, t) { var p = M.qs('#g2-p2', m); if (p) p.textContent = n(d) + ' / ' + n(t); M._aiStatus && M._aiStatus(d < t ? 'اكتملت دفعة — جاري الباقي…' : 'جاري التجهيز للمراجعة…'); M.sound && M.sound('tick'); }).then(function (res) {
+            finish();
             M.log('توليد أسئلة من الدرس', lesson.name, M.AI_PROVIDERS[r.provider].name + ' ' + model + ' · عدد ' + res.questions.length + ' · توكنز ' + (res.usage.input_tokens + res.usage.output_tokens));
             if (!res.questions.length) { go.disabled = false; return err(res.errors.join(' — ') || 'لم تُقترح أسئلة'); }
             M.notifyDone && M.notifyDone('اكتمل توليد الأسئلة', res.questions.length + ' سؤال من درس ' + lesson.name + ' جاهزة للمراجعة');
             close(); M.aiReview(lesson, res);
-          }).catch(function (e) { go.disabled = false; err(friendly(e.message)); });
+          }).catch(function (e) { finish(); go.disabled = false; err(friendly(e.message)); });
         };
 
         /* اليدوي */

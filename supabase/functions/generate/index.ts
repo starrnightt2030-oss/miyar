@@ -25,7 +25,7 @@ async function listModels(p: string) {
     return (j.data || []).filter((m: any) => /^(gpt-|o\d|chatgpt)/.test(m.id) && !/(audio|realtime|tts|transcribe|image|embedding|search|instruct|codex|moderation)/.test(m.id))
       .sort((a: any, b: any) => (b.created || 0) - (a.created || 0)).map((m: any) => ({ id: m.id, label: m.id }));
   }
-  const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=" + encodeURIComponent(k));
+  const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": k } });
   const j = await r.json(); if (!r.ok) throw new Error(j?.error?.message || r.statusText);
   return (j.models || []).filter((m: any) => (m.supportedGenerationMethods || []).includes("generateContent") && /gemini/.test(m.name) && !/(image|tts|embedding|audio|live|robotics|computer)/.test(m.name))
     .map((m: any) => ({ id: m.name.replace(/^models\//, ""), label: m.displayName || m.name })).reverse();
@@ -72,8 +72,8 @@ Deno.serve(async (req) => {
   } else {
     const gc = body.generationConfig || {};
     gc.maxOutputTokens = Math.min(Number(gc.maxOutputTokens) || 8000, 16000);
-    r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(KEYS[p]!), {
-      method: "POST", headers: { "content-type": "application/json" },
+    r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
+      method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": KEYS[p]! },
       body: JSON.stringify({ systemInstruction: body.systemInstruction, contents: body.contents, generationConfig: gc }),
     });
   }

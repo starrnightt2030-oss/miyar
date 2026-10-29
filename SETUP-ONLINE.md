@@ -24,7 +24,7 @@
 1. يكفي مفتاح واحد من أي مزود — أو أكثر:
    - **Claude:** console.anthropic.com ← API Keys (يبدأ بـ `sk-ant-`)
    - **ChatGPT:** platform.openai.com ← API keys (يبدأ بـ `sk-`)
-   - **Gemini:** aistudio.google.com ← Get API key (يبدأ بـ `AIza`) — له حصة مجانية محدودة
+   - **Gemini:** aistudio.google.com ← Get API key (المفاتيح الجديدة تبدأ بـ `AQ.` والقديمة بـ `AIza` — الاثنان يعملان) — له حصة مجانية محدودة، واختر نموذج Flash
 2. أضف رصيداً من صفحة Billing عند المزود (Claude وChatGPT).
 3. **التكلفة التقريبية:** حوالي ٠٫٣ دولار لتوليد أسئلة درس من ٦ صفحات بأربعة أنواع (Sonnet)، وحوالي الضعف مع Opus. لوحة الأونلاين عند المدير تعرض الاستهلاك الشهري.
 

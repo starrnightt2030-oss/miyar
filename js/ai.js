@@ -9,12 +9,12 @@
   M.AI_PROVIDERS = {
     anthropic: { name: 'Claude', by: 'Anthropic', keyHint: 'sk-ant-…', site: 'console.anthropic.com' },
     openai: { name: 'ChatGPT', by: 'OpenAI', keyHint: 'sk-…', site: 'platform.openai.com' },
-    gemini: { name: 'Gemini', by: 'Google', keyHint: 'AIza…', site: 'aistudio.google.com' }
+    gemini: { name: 'Gemini', by: 'Google', keyHint: 'AQ.… أو AIza…', site: 'aistudio.google.com' }
   };
   M.aiDetectProvider = function (key) {
     key = String(key || '').trim();
     if (/^sk-ant-/.test(key)) return 'anthropic';
-    if (/^AIza/.test(key)) return 'gemini';
+    if (/^(AIza|AQ\.)/.test(key)) return 'gemini'; /* AQ. = مفاتيح AI Studio الجديدة */
     if (/^sk-/.test(key)) return 'openai';
     return '';
   };
@@ -155,7 +155,7 @@
       },
       call: function (body, key) {
         var model = body.__model; var b = Object.assign({}, body); delete b.__model;
-        return post('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(key), {}, b);
+        return post('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent', { 'x-goog-api-key': key }, b);
       },
       parse: function (j) {
         var cand = j.candidates && j.candidates[0];
@@ -164,12 +164,13 @@
         return { text: txt, usage: { input_tokens: (j.usageMetadata || {}).promptTokenCount || 0, output_tokens: (j.usageMetadata || {}).candidatesTokenCount || 0 } };
       },
       models: function (key) {
-        return get('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=' + encodeURIComponent(key), {}).then(function (j) {
+        return get('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { 'x-goog-api-key': key }).then(function (j) {
           return (j.models || []).filter(function (m) { return (m.supportedGenerationMethods || []).indexOf('generateContent') >= 0 && /gemini/.test(m.name) && !/(image|tts|embedding|audio|live|robotics|computer)/.test(m.name); })
             .map(function (m) { return { id: m.name.replace(/^models\//, ''), label: m.displayName || m.name }; }).reverse();
         });
       },
-      pick: function (list) { return pickBy(list, [/pro/, /flash(?!-lite)/, /gemini/]); }
+      /* Flash أولاً: ممتاز في قراءة الصور ومتاح في الحصة المجانية (Pro غالباً يحتاج حساباً مدفوعاً) */
+      pick: function (list) { return pickBy(list.filter(function (m) { return !/(preview-0|exp|lite|nano|gemma)/.test(m.id); }).concat(list), [/flash/, /pro/, /gemini/]); }
     }
   };
   function pickBy(list, pats) { for (var i = 0; i < pats.length; i++) { var m = list.find(function (x) { return pats[i].test(x.id); }); if (m) return m.id; } return list[0] ? list[0].id : ''; }
@@ -179,12 +180,15 @@
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) { var e = new Error(errMsg(j) || ('HTTP ' + r.status)); e.status = r.status; throw e; } return j; }); });
   }
   function get(url, headers) {
-    return fetch(url, { headers: headers }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(errMsg(j) || ('HTTP ' + r.status)); return j; }); });
+    return fetch(url, { headers: headers }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) { var e = new Error(errMsg(j) || ('HTTP ' + r.status)); e.status = r.status; throw e; } return j; }); });
   }
   function errMsg(j) { var e = j && j.error; if (!e) return ''; return typeof e === 'string' ? e : (e.message || JSON.stringify(e)); }
   function friendly(m) {
-    if (/401|invalid.*key|API key not valid|incorrect api key|authentication/i.test(m)) return 'المفتاح غير صحيح أو منتهي — راجعه في الإعدادات';
-    if (/429|rate|quota|exceeded/i.test(m)) return 'تجاوزت الحد المسموح أو الرصيد انتهى — انتظر قليلاً أو راجع رصيد الحساب';
+    if (/limit: 0|free_tier.*limit.*\b0\b|not available.*free/i.test(m)) return 'هذا النموذج غير متاح في الحصة المجانية — اختر نموذج Flash من القائمة';
+    if (/ACCESS_TOKEN_TYPE_UNSUPPORTED|401|invalid.*key|API key not valid|API_KEY_INVALID|incorrect api key|authentication|unauthenticated/i.test(m)) return 'المفتاح غير صحيح أو منتهي — انسخه كاملاً من جديد وتأكد أنه بدون مسافات';
+    if (/PERMISSION_DENIED|403|has not been used|disabled/i.test(m)) return 'المفتاح لا يملك صلاحية Gemini API — أنشئ مفتاحاً جديداً من aistudio.google.com';
+    if (/location is not supported|User location/i.test(m)) return 'الخدمة غير متاحة من موقعك الحالي';
+    if (/429|rate|quota|exceeded|RESOURCE_EXHAUSTED/i.test(m)) return 'تجاوزت الحد المسموح في الدقيقة أو اليوم — انتظر دقيقة وأعد المحاولة، أو قلّل عدد الأنواع في المرة الواحدة';
     if (/credit|billing|balance/i.test(m)) return 'رصيد الحساب غير كافٍ — أضف رصيداً من موقع المزود';
     if (/model.*(not found|does not exist)|not supported/i.test(m)) return 'النموذج المختار غير متاح لهذا المفتاح — اختر نموذجاً آخر من القائمة';
     if (/Failed to fetch|NetworkError/i.test(m)) return 'تعذّر الاتصال — تحقق من الإنترنت';
@@ -231,7 +235,19 @@
     var p = route.via === 'cloud' ? M.cloud.invoke('generate', { provider: route.provider, model: model, body: body }) : ad.call(body, keys()[route.provider]);
     return p.then(function (j) { var r = ad.parse(j); var d = parseJSONText(r.text); return { notes: d.notes || '', questions: d.questions || [], usage: r.usage }; });
   }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function withRetry(fn, tries) {
+    return fn().catch(function (e) {
+      var rl = e.status === 429 || e.status === 503 || /RESOURCE_EXHAUSTED|UNAVAILABLE|overloaded|rate limit/i.test(e.message);
+      if (!rl || tries <= 0 || /limit: 0/.test(e.message)) throw e;
+      var m = /retry in ([\d.]+)s|"retryDelay":\s*"(\d+)s/i.exec(e.message || ''), d = m ? Number(m[1] || m[2]) * 1000 : 0;
+      return wait(Math.min(Math.max(d, (4 - tries) * 8000), 65000)).then(function () { return withRetry(fn, tries - 1); });
+    });
+  }
   M.aiCall = function (route, model, spec) {
+    return withRetry(function () { return aiCall0(route, model, spec); }, 3);
+  };
+  function aiCall0(route, model, spec) {
     return callOnce(route, model, spec, 0).catch(function (e) {
       /* Gemini: بعض الإصدارات لا تدعم responseJsonSchema → نجرب الصيغة الأقدم ثم بدون مخطط */
       if (route.provider === 'gemini' && /responseJsonSchema|response_json_schema|Unknown name|Invalid JSON payload/i.test(e.message)) {
@@ -239,7 +255,7 @@
       }
       throw e;
     });
-  };
+  }
 
   /* طلب لكل نوع بالتوازي (أسرع ويتجنب انتهاء المهلة) */
   M.aiGenerate = function (opts, onProgress) {
@@ -252,7 +268,9 @@
         usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0;
       }).catch(function (e) { errors.push(M.TYPE[t].label + ': ' + friendly(e.message)); }).then(function () { done++; if (onProgress) onProgress(done, opts.types.length); return next(); });
     }
-    var w = []; for (var i = 0; i < Math.min(3, types.length); i++) w.push(next());
+    /* Gemini المجاني حدوده في الدقيقة قليلة → طلبان متوازيان فقط */
+    var par = opts.route.provider === 'gemini' ? 2 : 3;
+    var w = []; for (var i = 0; i < Math.min(par, types.length); i++) w.push(next());
     return Promise.all(w).then(function () { return { questions: results, notes: notes, errors: errors, usage: usage }; });
   };
 
@@ -482,7 +500,7 @@
     var k = keys();
     return '<div class="card" id="ai-card"><h2 style="margin-bottom:6px">الذكاء الاصطناعي لتوليد الأسئلة</h2>' +
       '<p class="small muted" style="margin:0 0 10px">أضف أي مفتاح — Claude أو ChatGPT أو Gemini — ويتعرّف التطبيق على نوعه تلقائياً. المفاتيح تبقى على هذا الجهاز فقط ولا تدخل في الحزم أو النسخ الاحتياطية، والتكلفة على حساب صاحب المفتاح. (مع الخادم الأونلاين يكفي مفتاح واحد على الخادم لكل المدرسين.)</p>' +
-      '<div class="row"><input id="ai-newk" class="inp" type="password" dir="ltr" style="max-width:420px" placeholder="الصق المفتاح هنا: sk-ant-… أو sk-… أو AIza…" autocomplete="off" aria-label="مفتاح API"><button class="btn pri" id="ai-addk">إضافة المفتاح</button></div>' +
+      '<div class="row"><input id="ai-newk" class="inp" type="password" dir="ltr" style="max-width:420px" placeholder="الصق المفتاح هنا: sk-ant-… أو sk-… أو AQ.… / AIza…" autocomplete="off" aria-label="مفتاح API"><button class="btn pri" id="ai-addk">إضافة المفتاح</button></div>' +
       '<div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">' + Object.keys(M.AI_PROVIDERS).map(function (p) {
         var P = M.AI_PROVIDERS[p], has = !!k[p];
         return '<div class="row" style="padding:8px 0;border-bottom:1px solid #EEF0F4"><b style="min-width:90px">' + P.name + '</b><span class="small muted" style="flex:1">' + P.by + ' · ' + (has ? '<span class="chip ok">مفعّل ••••' + esc(k[p].slice(-4)) + '</span>' + ((S.settings.aiModels || {})[p] ? ' النموذج: <span class="p-code">' + esc(S.settings.aiModels[p]) + '</span>' : '') : 'المفتاح من ' + P.site) + '</span>' +
@@ -493,7 +511,7 @@
     var add = M.qs('#ai-addk', root);
     if (add) add.onclick = function () {
       var v = M.qs('#ai-newk', root).value.trim(), p = M.aiDetectProvider(v);
-      if (!p) return M.toast('لم أتعرف على نوع المفتاح — Claude يبدأ بـ sk-ant- ، ChatGPT بـ sk- ، Gemini بـ AIza', 'bad');
+      if (!p) return M.toast('لم أتعرف على نوع المفتاح — Claude يبدأ بـ sk-ant- ، ChatGPT بـ sk- ، Gemini بـ AQ. أو AIza', 'bad');
       var k = keys(); k[p] = v;
       M.setSetting('aiKeys', k).then(function () { if (p === 'anthropic' && S.settings.aiKey) M.setSetting('aiKey', ''); M.toast('تمت إضافة مفتاح ' + M.AI_PROVIDERS[p].name, 'ok'); M.render(); });
     };

@@ -312,16 +312,22 @@
 
   M.views.q = function (main, r) {
     var isNew = r.id === 'new';
-    var q = isNew ? M.newQuestion(r.q.type || 'mcq', r.q.l || '') : JSON.parse(JSON.stringify(M.byId('questions', r.id) || {}));
+    /* وضع الامتحان: سؤال يُكتب داخل ورقة امتحان (يدوي) ولا يدخل البنك إلا إذا طلبت */
+    var ex = r.q.exam ? M.byId('exams', r.q.exam) : null, secI = Number(r.q.sec) || 0;
+    if (r.q.exam && !ex) { main.innerHTML = '<div class="content"><div class="empty">الامتحان غير موجود</div></div>'; return; }
+    var q = ex ? (isNew ? M.newQuestion(r.q.type || 'mcq', '') : JSON.parse(JSON.stringify((ex.local || {})[r.id] || {})))
+      : isNew ? M.newQuestion(r.q.type || 'mcq', r.q.l || '') : JSON.parse(JSON.stringify(M.byId('questions', r.id) || {}));
     if (!q.id) { main.innerHTML = '<div class="content"><div class="empty">السؤال غير موجود</div></div>'; return; }
-    var orig = isNew ? null : M.byId('questions', r.id);
+    if (ex && isNew) { q.subjectId = ex.subjectId || ''; if (ex.sections[secI]) q.type = ex.sections[secI].type; }
+    var orig = isNew || ex ? null : M.byId('questions', r.id);
+    var exBack = ex ? '#/exam/' + ex.id + '?step=questions&sec=' + secI : '';
     var digits = S.settings.digits || 'arabic';
     var lastField = null;
     var p = M.lessonPath(q.lessonId);
-    var subjectId = q.subjectId || (p.subject && p.subject.id) || '';
+    var subjectId = q.subjectId || (p.subject && p.subject.id) || (ex ? ex.subjectId : '') || '';
 
     function lessonOptions() {
-      var h = '<option value="">— اختر الدرس —</option>';
+      var h = '<option value="">' + (ex ? '— بدون (سؤال الورقة فقط) —' : '— اختر الدرس —') + '</option>';
       S.subjects.forEach(function (s) {
         if (subjectId && s.id !== subjectId) return;
         M.unitsOf(s.id).forEach(function (u) {
@@ -380,7 +386,7 @@
 
     function formHTML() {
       return '<div class="card"><div class="grid2">' +
-        '<div class="field"><label for="f-lesson">الدرس</label><select id="f-lesson" class="inp">' + lessonOptions() + '</select></div>' +
+        '<div class="field"><label for="f-lesson">الدرس' + (ex ? ' (اختياري)' : '') + '</label><select id="f-lesson" class="inp">' + lessonOptions() + '</select></div>' +
         '<div class="field"><label for="f-out">ناتج التعلم</label><div class="row" style="gap:6px;flex-wrap:nowrap"><select id="f-out" class="inp">' + outcomeOptions() + '</select><button type="button" class="btn icon" id="f-addout" aria-label="ناتج جديد"' + (q.lessonId ? '' : ' disabled') + '>' + I('plus', 16) + '</button></div></div></div>' +
         '<div class="grid3" style="margin-top:12px"><div class="field"><span class="lbl">المستوى المعرفي</span>' + seg('f-level', M.LEVELS, q.level) + '</div>' +
         '<div class="field"><span class="lbl">الصعوبة</span>' + seg('f-diff', M.DIFFS, q.difficulty) + '</div>' +
@@ -389,13 +395,18 @@
         '<div class="symbar" aria-label="رموز رياضية وعلمية"><button type="button" class="btn sm pri" id="f-math" style="font-family:Naskh,serif">∑ معادلة</button>' + SYMBOLS.map(function (s) { return '<button type="button" class="btn sm" data-sym="' + esc(s) + '" style="min-width:36px;padding:0 6px;font-family:Naskh,serif">' + esc(s) + '</button>'; }).join('') + '</div>' +
         typeFields() + '</div>' +
         '<div class="card" style="display:flex;flex-direction:column;gap:10px"><div class="row"><h3 style="flex:1">شكل مرفق بالسؤال (اختياري)</h3><button type="button" class="btn sm" id="f-drawfig">' + I('t_draw', 16) + ' ' + (q.figureShapes ? 'تعديل الرسم' : 'رسم شكل') + '</button><button type="button" class="btn sm" id="f-upfig">' + I('t_image', 16) + ' رفع صورة</button>' + (q.figure ? '<button type="button" class="btn sm danger" id="f-rmfig">إزالة</button>' : '') + '</div>' +
-        (q.figure ? '<div class="row" style="align-items:flex-start"><img src="' + q.figure + '" alt="الشكل" style="max-width:260px;max-height:180px;border:1px solid var(--line);border-radius:8px;background:#fff"><div class="field" style="min-width:200px"><label for="f-figw">عرض الشكل في الورقة: <span id="f-figwv">' + n(q.figureWidth || 60) + '٪</span></label><input id="f-figw" type="range" min="25" max="100" step="5" value="' + (q.figureWidth || 60) + '"></div></div>' : '<div class="small muted">ارسم شكلاً هندسياً أو مستوى إحداثياً أو خط أعداد، أو ارفع صورة؛ يظهر تحت نص السؤال في الورقة.</div>') + '</div>' +
+        (q.figure ? '<div class="row" style="align-items:flex-start"><img src="' + q.figure + '" alt="الشكل" style="max-width:220px;max-height:170px;border:1px solid var(--line);border-radius:8px;background:#fff"><div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:10px"><div class="field"><label for="f-figw">عرض الشكل في الورقة: <span id="f-figwv">' + n(q.figureWidth || 60) + '٪</span></label><input id="f-figw" type="range" min="15" max="100" step="5" value="' + (q.figureWidth || 60) + '"></div>' +
+          '<div class="field"><span class="lbl">موضع الشكل</span><div class="seg wrap" id="f-figpos">' + [['below', 'تحت السؤال'], ['above', 'فوقه'], ['side', 'بجانبه يسار'], ['side-start', 'بجانبه يمين'], ['after', 'بعد الإجابة']].map(function (o) { return '<button type="button" data-v="' + o[0] + '" class="' + ((q.figurePos || 'below') === o[0] ? 'on' : '') + '">' + o[1] + '</button>'; }).join('') + '</div></div>' +
+          '<div class="grid2"><div class="field"><span class="lbl">المحاذاة</span><div class="seg" id="f-figal">' + [['start', 'يمين'], ['center', 'وسط'], ['end', 'يسار']].map(function (o) { return '<button type="button" data-v="' + o[0] + '" class="' + ((q.figureAlign || 'center') === o[0] ? 'on' : '') + '">' + o[1] + '</button>'; }).join('') + '</div></div>' +
+          '<div class="field"><label for="f-figcap">تعليق تحت الشكل</label><input id="f-figcap" class="inp paper-font" data-k="figureCaption" value="' + esc(q.figureCaption || '') + '" placeholder="شكل (١)"></div></div></div></div>' : '<div class="small muted">ارسم شكلاً هندسياً أو مستوى إحداثياً أو خط أعداد، أو ارفع صورة؛ يظهر تحت نص السؤال في الورقة.</div>') + '</div>' +
         (q.reviewNote && q.status === 'returned' ? '<div class="alert bad">' + I('warn') + '<div>ملاحظة المراجع: ' + esc(q.reviewNote) + '</div></div>' : '') +
         (q.evidence ? '<div class="small" style="background:#FFFBEB;border-inline-start:3px solid #D97706;padding:8px 12px;border-radius:8px"><b>الدليل من الكتاب' + (q.evidencePage ? ' (صفحة ' + n(q.evidencePage) + ')' : '') + ': </b>' + esc(q.evidence) + '</div>' : '') +
         '<div id="f-errs"></div>' +
-        '<div class="row"><button class="btn pri" id="f-save">' + I('check') + ' حفظ</button><button class="btn" id="f-submit">حفظ وإرسال للمراجعة</button>' +
+        (ex ? '<div class="row"><button class="btn pri" id="f-xsave">' + I('check') + ' حفظ في الورقة</button><button class="btn" id="f-xnew">حفظ وفرع جديد</button>' + (!isNew ? '<button class="btn danger" id="f-xdel">' + I('trash', 16) + ' حذف من الورقة</button>' : '') +
+          '<label class="check" style="margin-inline-start:auto"><input type="checkbox" id="f-tobank"> وأضف نسخة لبنك الأسئلة (مسودة — يلزم اختيار الدرس)</label></div>'
+        : '<div class="row"><button class="btn pri" id="f-save">' + I('check') + ' حفظ</button><button class="btn" id="f-submit">حفظ وإرسال للمراجعة</button>' +
         (M.can('approve') ? '<button class="btn" id="f-approve">حفظ واعتماد</button>' : '') +
-        '<button class="btn" id="f-savenew">حفظ وسؤال جديد</button>' + (!isNew && q.status !== 'approved' && !(q.usedIn || []).length ? '<button class="btn danger" id="f-del">' + I('trash', 16) + ' حذف</button>' : '') + '</div>';
+        '<button class="btn" id="f-savenew">حفظ وسؤال جديد</button>' + (!isNew && q.status !== 'approved' && !(q.usedIn || []).length ? '<button class="btn danger" id="f-del">' + I('trash', 16) + ' حذف</button>' : '') + '</div>');
     }
 
     function previewHTML() {
@@ -403,8 +414,9 @@
         '<div class="preview-body" id="pv-body"></div><div style="padding:10px 14px;border-top:1px solid #EEF0F4" class="small"><b>الإجابة: </b><span id="pv-ans"></span></div>';
     }
 
-    var title = (isNew ? 'سؤال جديد' : 'تعديل سؤال') + ' — ' + M.TYPE[q.type].label;
-    main.innerHTML = M.topbar(title, (p.lesson ? esc(p.subject ? p.subject.name : '') + ' · ' + esc(p.lesson.name) : '') + (isNew ? '' : ' · إصدار ' + n(q.ver || 1) + ' · ' + (M.STATUS[q.status] || {}).label), '', p.lesson ? M.link('bank', '', { s: subjectId, l: q.lessonId }) : '#/bank') +
+    var title = (ex ? (isNew ? 'فرع جديد في الورقة' : 'تعديل فرع في الورقة') : (isNew ? 'سؤال جديد' : 'تعديل سؤال')) + ' — ' + M.TYPE[q.type].label;
+    var exSi = ex ? M.secInfo(ex).info[secI] : null;
+    main.innerHTML = M.topbar(title, ex ? esc(ex.title || 'امتحان') + (exSi ? ' · السؤال ' + M.ordinal(exSi.main) + (exSi.hasParts ? ' (' + M.partLabel(ex, exSi.part) + ')' : '') : '') : (p.lesson ? esc(p.subject ? p.subject.name : '') + ' · ' + esc(p.lesson.name) : '') + (isNew ? '' : ' · إصدار ' + n(q.ver || 1) + ' · ' + (M.STATUS[q.status] || {}).label), '', ex ? exBack : p.lesson ? M.link('bank', '', { s: subjectId, l: q.lessonId }) : '#/bank') +
       '<div class="content"><div class="editor"><div class="form" id="f-form">' + formHTML() + '</div><aside class="preview" id="f-pv">' + previewHTML() + '</aside></div></div>';
 
     function readForm() {
@@ -465,6 +477,8 @@
       var uf = M.qs('#f-upfig', f); if (uf) uf.onclick = function () { readForm(); M.pickFile('image/*').then(function (fl) { if (!fl[0]) return; return M.readFile(fl[0], 'dataurl').then(function (d) { return M.shrinkImage(d, 1200); }).then(function (d) { q.figure = d; q.figureShapes = null; q.figureWidth = q.figureWidth || 60; rebuild(); }); }); };
       var rf = M.qs('#f-rmfig', f); if (rf) rf.onclick = function () { readForm(); q.figure = ''; q.figureShapes = null; rebuild(); };
       var fw = M.qs('#f-figw', f); if (fw) fw.oninput = function () { q.figureWidth = Number(fw.value); M.qs('#f-figwv', f).textContent = n(fw.value) + '٪'; updPreview(); };
+      M.qsa('#f-figpos button', f).forEach(function (b) { b.onclick = function () { readForm(); q.figurePos = b.dataset.v; if ((q.figurePos === 'side' || q.figurePos === 'side-start') && (Number(q.figureWidth) || 60) > 50) q.figureWidth = 40; rebuild(); }; });
+      M.qsa('#f-figal button', f).forEach(function (b) { b.onclick = function () { readForm(); q.figureAlign = b.dataset.v; M.qsa('#f-figal button', f).forEach(function (x) { x.classList.toggle('on', x === b); }); updPreview(); }; });
       var dimg = M.qs('#f-drawimg', f); if (dimg) dimg.onclick = function () { readForm(); M.drawEditor({ shapes: q.imageShapes }, function (r) { q.image = r.image; q.imageShapes = r.shapes; rebuild(); }); };
       var ir = M.qs('#f-imgrm', f); if (ir) ir.onclick = function () { readForm(); q.image = ''; rebuild(); };
       var mb = M.qs('#f-mkblank', f); if (mb) mb.onclick = function () {
@@ -491,6 +505,32 @@
           then();
         });
       };
+      if (ex) {
+        var xgo = function (then) {
+          readForm();
+          var errs = M.validateQuestion(q).filter(function (x) { return !/الدرس/.test(x); });
+          var toBank = M.qs('#f-tobank', main).checked;
+          if (toBank && !q.lessonId) { M.qs('#f-errs', main).innerHTML = '<div class="alert bad">' + I('warn') + '<div>لإضافة نسخة للبنك اختر الدرس أولاً</div></div>'; return; }
+          var cur = M.byId('exams', ex.id); if (!cur) return M.toast('الامتحان غير موجود', 'bad');
+          cur = JSON.parse(JSON.stringify(cur));
+          cur.local = cur.local || {};
+          q.source = q.source || 'exam'; q.status = 'draft';
+          cur.local[q.id] = JSON.parse(JSON.stringify(q));
+          if (!cur.sections[secI]) cur.sections.push({ id: M.uid(), type: q.type, title: '', items: [], wordBank: true, layout: 'auto' }), secI = cur.sections.length - 1;
+          var sec = cur.sections[secI];
+          if (!sec.items.some(function (it) { return it.qid === q.id; })) sec.items.push({ qid: q.id, grade: null });
+          var jobs = [M.save('exams', cur, { log: false })];
+          if (toBank) { var bq = JSON.parse(JSON.stringify(q)); bq.id = M.uid(); bq.status = 'draft'; bq.source = 'exam'; delete bq.ver; jobs.push(M.save('questions', bq)); }
+          Promise.all(jobs).then(function () {
+            M.toast(errs.length ? 'حُفظ في الورقة — تنبيه: ' + errs[0] : 'حُفظ في الورقة' + (toBank ? ' وأضيفت نسخة للبنك' : ''), errs.length ? '' : 'ok');
+            then();
+          });
+        };
+        M.qs('#f-xsave', main).onclick = function () { xgo(function () { M.go(exBack); }); };
+        M.qs('#f-xnew', main).onclick = function () { xgo(function () { M.go('#/q/new?exam=' + ex.id + '&sec=' + secI + '&type=' + q.type + '&n=' + Date.now()); }); };
+        var xd = M.qs('#f-xdel', main); if (xd) xd.onclick = function () { M.confirm('حذف الفرع', 'حذف هذا الفرع من الورقة؟', 'حذف', true).then(function (ok) { if (!ok) return; var cur = JSON.parse(JSON.stringify(M.byId('exams', ex.id))); cur.sections.forEach(function (s2) { s2.items = s2.items.filter(function (it) { return it.qid !== q.id; }); }); if (cur.local) delete cur.local[q.id]; M.save('exams', cur, { log: false }).then(function () { M.go(exBack); }); }); };
+        return;
+      }
       var back = function () { M.go(M.link('bank', '', { s: q.subjectId, l: q.lessonId })); };
       M.qs('#f-save', main).onclick = function () { go('draft', back); };
       M.qs('#f-submit', main).onclick = function () { go('review', back); };

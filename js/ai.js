@@ -66,12 +66,13 @@
     problem: 'مسألة: مسألة حسابية بقيم عددية صحيحة متسقة، modelAnswer = الحل بالخطوات والقانون والوحدة والناتج النهائي مع توزيع الدرجات. اكتب المعادلات بصيغة $...$ مثل $\\frac{V}{R}$ و $I^{2}$ و $\\sqrt{x}$.'
   };
 
-  function systemPrompt() {
+  function systemPrompt(fromText) {
     return 'أنت خبير تقويم تربوي ومراجع علمي في مدرسة ثانوية صناعية (تعليم فني). مهمتك إعداد أسئلة امتحانية لبنك أسئلة رسمي يخضع لمراجعة الجودة (ISO 21001)، لذلك الدقة العلمية واللغوية مقدّمة على كل شيء.\n\n' +
-      'الصور المرفقة هي صفحات شرح الدرس من الكتاب المدرسي (ليست أسئلة). اقرأ الشرح والأشكال والجداول والقوانين، ثم أنشئ أنت الأسئلة منها.\n\n' +
+      (fromText ? 'النص المرفق منقول بدقة من صفحات شرح الدرس في الكتاب المدرسي (ليس أسئلة)، والأشكال موصوفة بين [شكل: ...]. اقرأ الشرح والأشكال والجداول والقوانين، ثم أنشئ أنت الأسئلة منها.\n\n'
+        : 'الصور المرفقة هي صفحات شرح الدرس من الكتاب المدرسي (ليست أسئلة). اقرأ الشرح والأشكال والجداول والقوانين، ثم أنشئ أنت الأسئلة منها.\n\n') +
       'قواعد إلزامية:\n' +
       '1) اعتمد فقط على محتوى الصفحات المرفقة. كل سؤال يجب أن تكون إجابته موجودة صراحة في الصفحات. لا تضف معلومات من خارجها.\n' +
-      '2) لكل سؤال اكتب في evidence الجملة أو القيمة التي تثبت الإجابة مقتبسة حرفياً من الصفحة (أو وصفاً دقيقاً للشكل)، وفي page رقم الصورة (يبدأ من 1).\n' +
+      '2) لكل سؤال اكتب في evidence الجملة أو القيمة التي تثبت الإجابة مقتبسة حرفياً من الصفحة (أو وصفاً دقيقاً للشكل)، وفي page رقم الصفحة (يبدأ من 1).\n' +
       '3) لغة عربية فصحى سليمة، صياغة مباشرة لا تحتمل تفسيرين، بدون تلميح للإجابة.\n' +
       '4) لا تكرر نفس الفكرة في سؤالين. غطِّ أفكار الدرس المختلفة بالتوازن.\n' +
       '5) المستوى المعرفي level: 0 تذكر، 1 فهم، 2 تطبيق، 3 تحليل وتقويم. الصعوبة difficulty: 0 سهل، 1 متوسط، 2 صعب. grade درجة مقترحة مناسبة.\n' +
@@ -95,8 +96,9 @@
       types.map(function (t) { return '- ' + opts.count + ' أسئلة من نوع «' + M.TYPE[t].label + '» (type = "' + t + '"). ' + TYPE_RULES[t]; }).join('\n') +
       '\nوزّع المستويات المعرفية قريباً من: ' + targetsText() + '، بما يناسب طبيعة كل نوع.\n' +
       (opts.extra ? 'تعليمات إضافية من المدرس: ' + opts.extra + '\n' : '') +
-      (!opts.images.length ? '\nلا توجد صور مرفقة: اعتمد على نص الدرس أعلاه فقط.\n' : '');
-    return { system: systemPrompt(), text: text, images: opts.images, schema: Q_SCHEMA };
+      (opts.pagesText ? '' : !opts.images.length ? '\nلا توجد صور مرفقة: اعتمد على نص الدرس أعلاه فقط.\n' : '');
+    if (opts.pagesText) return { system: systemPrompt(true), text: 'نص صفحات شرح الدرس (منقول من الكتاب):\n' + opts.pagesText + '\n\n' + text, images: [], schema: Q_SCHEMA };
+    return { system: systemPrompt(false), text: text, images: opts.images, schema: Q_SCHEMA };
   };
 
   function splitData(d) { var m = /^data:(image\/[a-z]+);base64,(.*)$/.exec(d); return { mime: m[1], data: m[2] }; }
@@ -237,15 +239,53 @@
     return list && list.length ? ADAPT[provider].pick(list) : '';
   };
 
-  function callOnce(route, model, spec, legacy) {
+  function rawCall(route, model, spec, legacy) {
     var ad = ADAPT[route.provider], body = ad.build(spec, model, legacy);
     var p = route.via === 'cloud' ? M.cloud.invoke('generate', { provider: route.provider, model: model, body: body }) : ad.call(body, keys()[route.provider]);
-    return p.then(function (j) { var r = ad.parse(j); var d = parseJSONText(r.text); return { notes: d.notes || '', questions: d.questions || [], usage: r.usage }; });
+    return p.then(function (j) { return ad.parse(j); });
   }
+  function callOnce(route, model, spec, legacy) {
+    return rawCall(route, model, spec, legacy).then(function (r) { var d = parseJSONText(r.text); return { notes: d.notes || '', questions: d.questions || [], usage: r.usage }; });
+  }
+  function schemaFallback(route, fn) {
+    return fn(0).catch(function (e) {
+      if (route.provider === 'gemini' && /responseJsonSchema|response_json_schema|thinking|Unknown name|Invalid JSON payload/i.test(e.message)) return fn(1).catch(function () { return fn(2); });
+      throw e;
+    });
+  }
+  function parseObj(txt) {
+    var t = String(txt || '').trim().replace(/^```(?:json)?/i, '').replace(/```\s*$/, '').trim();
+    var a = t.indexOf('{'), b = t.lastIndexOf('}'); if (a < 0) throw new Error('لا يوجد JSON في الرد');
+    return JSON.parse(t.slice(a, b + 1));
+  }
+
+  /* ===== قراءة صفحات الدرس مرة واحدة وحفظ نصها =====
+     التوليد بعد ذلك من النص: أسرع بكثير، أرخص، ولا يعيد رفع الصور مع كل دفعة */
+  function imgSig(imgs) { var h = 0; (imgs || []).forEach(function (d) { for (var i = 0; i < d.length; i += 997) h = (h * 31 + d.charCodeAt(i)) | 0; h = (h * 31 + d.length) | 0; }); return (imgs || []).length + ':' + h; }
+  M.lessonPagesText = function (lesson) { return lesson.pagesText && lesson.pagesSig === imgSig(lesson.images) ? lesson.pagesText : ''; };
+  var X_SCHEMA = { type: 'object', additionalProperties: false, required: ['pages'], properties: { pages: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['page', 'text'], properties: { page: { type: 'integer' }, text: { type: 'string' } } } } } };
+  M.aiExtract = function (route, model, lesson) {
+    var spec = {
+      system: 'أنت ناسخ دقيق لصفحات الكتب المدرسية العربية (تعليم فني صناعي). انقل محتوى كل صفحة نصاً كما هو بدون تلخيص ولا إضافة ولا تصحيح للمعنى.',
+      text: 'انقل محتوى صفحات الدرس المرفقة (' + lesson.images.length + ' صفحة بالترتيب) إلى نص:\n' +
+        '- كل صفحة في عنصر مستقل: page رقمها من 1، وtext محتواها كاملاً بترتيب القراءة.\n- حافظ على العناوين والتعريفات والقوانين والوحدات والقيم كما هي. اكتب المعادلات بصيغة $...$ والأرقام بالأرقام الإنجليزية.\n' +
+        '- الجداول: صفاً صفاً بفاصل |.\n- كل شكل أو رسم أو دائرة: اكتب [شكل: وصف دقيق لما فيه وأسماء أجزائه وبياناته].\n- تجاهل أرقام الصفحات والهوامش الزخرفية. إذا كان جزء غير مقروء اكتب [غير واضح].',
+      images: lesson.images, schema: X_SCHEMA
+    };
+    var t0 = Date.now();
+    return withRetry(function () { return schemaFallback(route, function (lg) { return rawCall(route, model, spec, lg); }); }, 3).then(function (r) {
+      var d = parseObj(r.text), pages = (d.pages || []).filter(function (p) { return p && String(p.text || '').trim(); });
+      if (!pages.length) throw new Error('لم يتمكن النموذج من قراءة الصفحات — تأكد من وضوح الصور');
+      var txt = pages.map(function (p, i) { return '[صفحة ' + (p.page || i + 1) + ']\n' + String(p.text).trim(); }).join('\n\n');
+      lesson.pagesText = txt; lesson.pagesSig = imgSig(lesson.images); lesson.pagesAt = M.nowISO ? M.nowISO() : new Date().toISOString();
+      M.log && M.log('قراءة صفحات الدرس', lesson.name, n(pages.length) + ' صفحة في ' + n(Math.round((Date.now() - t0) / 1000)) + ' ث');
+      return M.save('lessons', lesson, { log: false }).then(function () { return { text: txt, usage: r.usage }; });
+    });
+  };
   function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   function withRetry(fn, tries) {
     return fn().catch(function (e) {
-      var rl = e.status === 429 || e.status === 503 || /RESOURCE_EXHAUSTED|UNAVAILABLE|overloaded|rate limit/i.test(e.message);
+      var rl = e.status === 429 || e.status === 503 || e.status === 500 || /RESOURCE_EXHAUSTED|UNAVAILABLE|overloaded|rate limit/i.test(e.message);
       if (!rl || tries <= 0 || /limit: 0/.test(e.message)) throw e;
       var m = /retry in ([\d.]+)s|"retryDelay":\s*"(\d+)s/i.exec(e.message || ''), d = m ? Number(m[1] || m[2]) * 1000 : 0;
       var ms = Math.min(Math.max(d, (4 - tries) * 8000), 65000);
@@ -257,21 +297,30 @@
     return withRetry(function () { return aiCall0(route, model, spec); }, 3);
   };
   function aiCall0(route, model, spec) {
-    return callOnce(route, model, spec, 0).catch(function (e) {
-      /* Gemini: بعض الإصدارات لا تدعم responseJsonSchema → نجرب الصيغة الأقدم ثم بدون مخطط */
-      if (route.provider === 'gemini' && /responseJsonSchema|response_json_schema|thinking|Unknown name|Invalid JSON payload/i.test(e.message)) {
-        return callOnce(route, model, spec, 1).catch(function () { return callOnce(route, model, spec, 2); });
-      }
-      throw e;
-    });
+    /* Gemini: بعض الإصدارات لا تدعم responseJsonSchema → نجرب الصيغة الأقدم ثم بدون مخطط */
+    return schemaFallback(route, function (lg) { return callOnce(route, model, spec, lg); });
   }
 
   /* طلب لكل نوع بالتوازي (أسرع ويتجنب انتهاء المهلة) */
   M.aiGenerate = function (opts, onProgress) {
-    /* الأنواع تُجمع في دفعات (حتى ~١٨ سؤالاً لكل طلب) — الصور تُرسل مرات أقل والطلبات أقل */
-    var per = Math.max(1, Math.min(3, Math.floor(18 / Math.max(1, opts.count)))), batches = [];
+    var st = function (t) { if (M._aiStatus) M._aiStatus(t); };
+    /* المرحلة ١: قراءة الصفحات مرة واحدة (أو استخدام النص المحفوظ) */
+    if (opts.useText && opts.images.length && !opts.pagesText) {
+      var cached = M.lessonPagesText(opts.lesson);
+      if (cached) opts.pagesText = cached;
+      else {
+        st('المرحلة ١ من ٢: قراءة ' + n(opts.images.length) + ' صفحة وتحويلها لنص (مرة واحدة فقط للدرس)…');
+        return M.aiExtract(opts.route, opts.model, opts.lesson).then(function (x) {
+          opts.pagesText = x.text; opts._xUsage = x.usage; return M.aiGenerate(opts, onProgress);
+        });
+      }
+    }
+    if (opts.pagesText) st('المرحلة ٢ من ٢: إعداد الأسئلة من نص الدرس…');
+    /* الأنواع في دفعات: من النص طلبات صغيرة سريعة، ومن الصور دفعات أكبر لتقليل رفع الصور */
+    var cap = opts.pagesText ? 2 : 3;
+    var per = Math.max(1, Math.min(cap, Math.floor((opts.pagesText ? 12 : 18) / Math.max(1, opts.count)))), batches = [];
     for (var b = 0; b < opts.types.length; b += per) batches.push(opts.types.slice(b, b + per));
-    var results = [], notes = [], errors = [], done = 0, usage = { input_tokens: 0, output_tokens: 0 };
+    var results = [], notes = [], errors = [], failedTypes = [], done = 0, xu = opts._xUsage || {}, usage = { input_tokens: xu.input_tokens || 0, output_tokens: xu.output_tokens || 0 };
     function next() {
       var ts = batches.shift(); if (!ts) return Promise.resolve();
       var label = ts.map(function (t) { return M.TYPE[t].label; }).join('، ');
@@ -279,19 +328,19 @@
         r.questions.forEach(function (q) { if (!q.type || !M.TYPE[q.type] || ts.indexOf(q.type) < 0) q.type = M.TYPE[q.type] ? q.type : ts[0]; results.push(q); });
         if (r.notes) notes.push(label + ': ' + r.notes);
         usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0;
-      }).catch(function (e) { errors.push(label + ': ' + friendly(e.message)); }).then(function () { done += ts.length; if (onProgress) onProgress(done, opts.types.length); return next(); });
+      }).catch(function (e) { errors.push(label + ': ' + friendly(e.message)); failedTypes.push.apply(failedTypes, ts); }).then(function () { done += ts.length; if (onProgress) onProgress(done, opts.types.length); return next(); });
     }
     /* Gemini المجاني حدوده في الدقيقة قليلة → طلبان متوازيان فقط */
-    var par = opts.route.provider === 'gemini' ? 2 : 3;
+    var par = opts.route.provider === 'gemini' ? (opts.pagesText ? 3 : 2) : 4;
     var w = []; for (var i = 0, L = batches.length; i < Math.min(par, L); i++) w.push(next());
-    return Promise.all(w).then(function () { return { questions: results, notes: notes, errors: errors, usage: usage }; });
+    return Promise.all(w).then(function () { return { questions: results, notes: notes, errors: errors, failedTypes: failedTypes, usage: usage }; });
   };
 
   /* ===== الوضع اليدوي: طلب كامل يُنسخ لأي موقع ذكاء اصطناعي ===== */
   M.aiManualPrompt = function (opts) {
     var spec = M.aiSpec(opts, opts.types);
     return spec.system + '\n\n' + spec.text +
-      (opts.images.length ? '\nأرفقتُ مع هذه الرسالة ' + opts.images.length + ' صورة لصفحات الدرس بالترتيب (page من 1 إلى ' + opts.images.length + ').\n' : '') +
+      (opts.images.length && !opts.pagesText ? '\nأرفقتُ مع هذه الرسالة ' + opts.images.length + ' صورة لصفحات الدرس بالترتيب (page من 1 إلى ' + opts.images.length + ').\n' : '') +
       '\nأعد النتيجة كملف JSON فقط (بدون أي نص قبله أو بعده) بهذا الشكل بالضبط:\n' +
       '{"notes":"ملاحظاتك إن وجدت","questions":[{"type":"mcq","text":"...","options":["...","...","...","..."],"correct":0,"answer":false,"correction":"","pairs":[],"extras":[],"term":"","modelAnswer":"","lines":0,"level":0,"difficulty":1,"grade":1,"evidence":"اقتباس من الصفحة","page":1}]}\n' +
       'كل عنصر يحتوي كل الحقول السابقة. pairs شكلها [{"a":"...","b":"..."}].';
@@ -343,7 +392,11 @@
       (imgs.length ? '<div class="row" style="gap:8px;align-items:flex-start">' + imgs.map(function (d, i) {
         return '<div style="position:relative"><img src="' + d + '" alt="صفحة ' + n(i + 1) + '" data-liview="' + i + '" style="width:96px;height:128px;object-fit:cover;border:1px solid var(--line);border-radius:8px;cursor:zoom-in"><span class="chip" style="position:absolute;top:4px;inset-inline-start:4px">' + n(i + 1) + '</span>' +
           '<button class="btn icon sm" data-lidel="' + i + '" aria-label="حذف الصورة" style="position:absolute;top:2px;inset-inline-end:2px;min-height:28px;width:28px;background:#fff">' + I('x', 14) + '</button></div>';
-      }).join('') + '</div>' : '<div class="small muted">نصائح: صفحة واحدة في كل صورة، إضاءة جيدة، الكاميرا موازية للصفحة، والنص واضح ومقروء. حتى ' + n(MAX_IMAGES) + ' صفحة للدرس.</div>') + '</div>';
+      }).join('') + '</div>' : '<div class="small muted">نصائح: صفحة واحدة في كل صورة، إضاءة جيدة، الكاميرا موازية للصفحة، والنص واضح ومقروء. حتى ' + n(MAX_IMAGES) + ' صفحة للدرس.</div>') +
+      (M.lessonPagesText(lesson) ? '<details style="margin-top:10px"><summary class="bold" style="cursor:pointer">' + I('check', 16) + ' نص الدرس المقروء من الصفحات — راجعه وصحّحه (الأسئلة تُبنى منه)</summary>' +
+        '<textarea id="li-txt" class="inp" style="min-height:220px;margin-top:8px;line-height:1.9">' + esc(lesson.pagesText) + '</textarea>' +
+        '<div class="row" style="margin-top:6px"><button class="btn sm pri" id="li-txtsave">حفظ التصحيح</button><button class="btn sm ghost" id="li-txtclr">إعادة القراءة من الصور في المرة القادمة</button></div></details>'
+        : (lesson.pagesText && imgs.length ? '<div class="small muted" style="margin-top:8px">تغيّرت الصور — سيُعاد قراءة الصفحات عند التوليد القادم.</div>' : '')) + '</div>';
   };
 
   M.bindLessonImages = function (root, lesson) {
@@ -368,26 +421,30 @@
     });
     var gen = M.qs('#li-gen', root);
     if (gen) gen.onclick = function () { M.aiDialog2(lesson); };
+    var ts = M.qs('#li-txtsave', root); if (ts) ts.onclick = function () { lesson.pagesText = M.qs('#li-txt', root).value; M.save('lessons', lesson).then(function () { M.toast('حُفظ نص الدرس', 'ok'); }); };
+    var tc = M.qs('#li-txtclr', root); if (tc) tc.onclick = function () { lesson.pagesText = ''; lesson.pagesSig = ''; M.save('lessons', lesson).then(M.render); };
   };
 
   /* ===== نافذة التوليد الموحدة ===== */
-  M.aiDialog2 = function (lesson) {
+  M.aiDialog2 = function (lesson, preTypes) {
     var imgs = lesson.images || [];
     if (!imgs.length && !String(lesson.content || '').trim()) return M.toast('أضف صور شرح الدرس أولاً (أو اكتب نص الدرس)', 'bad');
     var routes = M.aiRoutes();
     var tab = routes.length ? 'auto' : 'manual';
-    var sel = ['mcq', 'tf', 'complete', 'reason'];
+    var sel = preTypes && preTypes.length ? preTypes : ['mcq', 'tf', 'complete', 'reason'];
+    var cachedTxt = M.lessonPagesText(lesson);
     var routeLabel = function (r) { return M.AI_PROVIDERS[r.provider].name + (r.via === 'cloud' ? ' — عبر خادم المدرسة' : ' — بمفتاح هذا الجهاز'); };
     M.modal({ title: 'توليد الأسئلة من الدرس — ' + lesson.name, wide: true,
       body: '<div class="alert info">' + I('t_image') + '<div>المصدر: <b>' + n(imgs.length) + ' صفحة شرح</b>' + (lesson.content ? ' + نص الدرس' : '') + ' — الأسئلة تُبنى من محتوى الدرس فقط، ومع كل سؤال دليل مقتبس من الكتاب.</div></div>' +
         '<div class="field"><span class="lbl">أنواع الأسئلة</span><div class="row" id="g2-types" style="gap:6px">' + M.TYPES.filter(function (t) { return t.id !== 'image'; }).map(function (t) { return '<label class="check chip" style="min-height:34px"><input type="checkbox" value="' + t.id + '"' + (sel.indexOf(t.id) >= 0 ? ' checked' : '') + '>' + t.label + '</label>'; }).join('') + '</div></div>' +
         '<div class="grid2"><div class="field"><label for="g2-n">عدد الأسئلة لكل نوع</label><input id="g2-n" class="inp" inputmode="numeric" value="٦"></div>' +
         '<div class="field"><label for="g2-x">تعليمات إضافية (اختياري)</label><input id="g2-x" class="inp" placeholder="مثال: ركّز على القوانين والوحدات"></div></div>' +
+        (imgs.length ? '<label class="check" style="align-items:flex-start"><input type="checkbox" id="g2-txt" checked><span><b>قراءة الصفحات مرة واحدة ثم التوليد من النص</b> — أسرع بكثير وأوفر، وتقدر تراجع النص المقروء وتصححه من صفحة الدرس.' + (cachedTxt ? ' <span class="chip ok">النص مقروء مسبقاً ✓</span>' : '') + '</span></label>' : '') +
         '<div class="seg" id="g2-tab"><button type="button" data-v="auto" class="' + (tab === 'auto' ? 'on' : '') + '">تلقائي عبر API</button><button type="button" data-v="manual" class="' + (tab === 'manual' ? 'on' : '') + '">يدوي: نسخ الطلب ولصق النتيجة</button></div>' +
         '<div id="g2-auto" class="card" style="padding:12px;display:flex;flex-direction:column;gap:10px">' +
         (routes.length ? '<div class="grid2"><div class="field"><label for="g2-r">مزود الذكاء الاصطناعي</label><select id="g2-r" class="inp">' + routes.map(function (r, i) { return '<option value="' + i + '">' + esc(routeLabel(r)) + '</option>'; }).join('') + '</select></div>' +
           '<div class="field"><label for="g2-m">النموذج</label><div class="row" style="gap:6px;flex-wrap:nowrap"><select id="g2-m" class="inp"><option>جاري تحميل النماذج…</option></select><button type="button" class="btn icon" id="g2-mr" aria-label="تحديث القائمة">' + I('shuffle', 16) + '</button></div></div></div>' +
-          '<div class="row"><button type="button" class="btn pri" id="g2-go">' + I('spark') + ' توليد الآن</button><span class="small muted">قد يستغرق دقيقة أو اثنتين</span></div>'
+          '<div class="row"><button type="button" class="btn pri" id="g2-go">' + I('spark') + ' توليد الآن</button><span class="small muted">' + (cachedTxt ? 'من النص المحفوظ: عادة أقل من دقيقة' : 'أول مرة للدرس: قراءة الصفحات ثم الأسئلة') + '</span></div>'
           : '<div class="alert warn">' + I('warn') + '<div>لا يوجد مفتاح API بعد. أضف أي مفتاح (Claude أو ChatGPT أو Gemini) من <a href="#/settings" data-x>الإعدادات</a>، أو سجّل الدخول للخادم الأونلاين — أو استخدم الوضع اليدوي.</div></div>') + '</div>' +
         '<div id="g2-manual" class="card" style="padding:12px;display:flex;flex-direction:column;gap:10px">' +
         '<ol class="small" style="margin:0;padding-inline-start:20px;line-height:1.9"><li>انسخ الطلب' + (imgs.length ? ' ونزّل صور الصفحات' : '') + '.</li><li>افتح Claude أو ChatGPT أو Gemini، الصق الطلب' + (imgs.length ? ' وارفق الصور بنفس الترتيب' : '') + ' وأرسل.</li><li>انسخ الرد (JSON) والصقه هنا، أو احفظه كملف وارفعه.</li></ol>' +
@@ -400,7 +457,8 @@
         var models = {};
         var opts = function () {
           var types = M.qsa('#g2-types input:checked', m).map(function (i) { return i.value; });
-          return { lesson: lesson, images: imgs, types: types, count: Math.min(15, Math.max(1, Number(M.toWestern(M.qs('#g2-n', m).value)) || 6)), extra: M.qs('#g2-x', m).value.trim() };
+          var tx = M.qs('#g2-txt', m), useText = !!(tx && tx.checked);
+          return { lesson: lesson, images: imgs, useText: useText, pagesText: useText ? M.lessonPagesText(lesson) : '', types: types, count: Math.min(15, Math.max(1, Number(M.toWestern(M.qs('#g2-n', m).value)) || 6)), extra: M.qs('#g2-x', m).value.trim() };
         };
         var showTab = function () {
           M.qs('#g2-auto', m).style.display = tab === 'auto' ? '' : 'none';
@@ -502,20 +560,23 @@
       }).join('');
     M.sound && M.sound('done');
     M.modal({ title: 'مراجعة الأسئلة المقترحة — ' + lesson.name, wide: true, body: ok.length ? html : '<div class="empty">لم تُقترح أسئلة صالحة.</div>',
-      foot: '<button class="btn pri" data-ok>إضافة المحدد للبنك كمسودات</button><button class="btn" data-x>إلغاء</button>',
+      foot: '<button class="btn pri" data-ok>إضافة المحدد للبنك كمسودات</button>' + ((res.failedTypes || []).length ? '<button class="btn" id="ar-retry">' + I('spark', 16) + ' إضافة المحدد ثم توليد الناقص</button>' : '') + '<button class="btn" data-x>إلغاء</button>',
       onMount: function (m, close) {
         M.qsa('[data-ai]', m).forEach(function (c) { c.onchange = function () { items[+c.dataset.ai].on = c.checked; }; });
         var setAll = function (v) { M.qsa('[data-ai]', m).forEach(function (c) { c.checked = v; items[+c.dataset.ai].on = v; }); };
         var a = M.qs('#ar-all', m); if (a) a.onclick = function () { setAll(true); };
         var nn = M.qs('#ar-none', m); if (nn) nn.onclick = function () { setAll(false); };
-        M.qs('[data-ok]', m).onclick = function () {
+        var addSel = function (after) {
           var list = items.filter(function (it) { return it.on && M.TYPE[it.x.type]; }).map(function (it) { return M.aiToQuestion(it.x, lesson.id); });
-          if (!list.length) return M.toast('لم يُحدد أي سؤال', 'bad');
+          if (!list.length && !after) return M.toast('لم يُحدد أي سؤال', 'bad');
           Promise.all(list.map(function (q) { return M.save('questions', q, { log: false }); })).then(function () {
-            M.log('إضافة أسئلة مولدة', lesson.name, 'عدد ' + list.length + ' — مسودة للمراجعة');
-            close(); M.toast('أضيف ' + n(list.length) + ' سؤال كمسودة — راجعها وأرسلها للاعتماد', 'ok'); M.render();
+            if (list.length) M.log('إضافة أسئلة مولدة', lesson.name, 'عدد ' + list.length + ' — مسودة للمراجعة');
+            close(); if (list.length) M.toast('أضيف ' + n(list.length) + ' سؤال كمسودة — راجعها وأرسلها للاعتماد', 'ok'); M.render();
+            if (after) setTimeout(after, 250);
           });
         };
+        M.qs('[data-ok]', m).onclick = function () { addSel(); };
+        var rt = M.qs('#ar-retry', m); if (rt) rt.onclick = function () { addSel(function () { M.aiDialog2(lesson, res.failedTypes); }); };
       } });
   };
 

@@ -10,7 +10,8 @@
     return { id: M.uid(), subjectId: subjectId, title: EXAM_TITLES[0], className: sub.className || '', specialization: sub.specialization || '', year: S.settings.year, duration: 'ساعتان', totalGrade: '',
       docId: (M.docFor('exam') || {}).id || '', digits: S.settings.digits || 'arabic', lang: 'ar', paper: 'a4', fontSize: 14, color: '#1F2A44', compact: false, separator: 'none',
       showStudent: true, showGradeTable: true, showInstructions: true, showSign: true, instructions: 'أجب عن جميع الأسئلة في نفس الورقة.', shuffleOptions: false,
-      sections: [], status: 'draft', model: '', groupId: '', scopeLessonIds: [], shuffleSeed: M.uid(), preparedBy: M.me().name || '' };
+      sections: [], local: {}, mode: 'bank', examDate: '', footerNote: S.settings.footerNote != null ? S.settings.footerNote : 'مع أطيب التمنيات بالنجاح والتوفيق',
+      status: 'draft', model: '', groupId: '', scopeLessonIds: [], shuffleSeed: M.uid(), preparedBy: M.me().name || '' };
   };
 
   /* ===== القائمة ===== */
@@ -30,14 +31,46 @@
           return '<a class="btn sm" href="#/exam/' + e.id + '">' + (e.model ? 'نموذج ' + esc(e.model) : 'فتح') + ' ' + (e.status === 'approved' ? '<span class="chip ok">معتمد</span>' : '<span class="chip warn">مسودة</span>') + '</a>';
         }).join('') + '</div></div>';
     }).join('');
-    main.innerHTML = M.topbar('الامتحانات', n(list.length) + ' ورقة', '<button class="btn" id="ex-new">' + I('plus') + ' امتحان فارغ</button><a class="btn pri" href="#/gen">' + I('spark') + ' توليد نماذج من البنك</a>') +
-      '<div class="content">' + (rows || '<div class="empty">لا توجد امتحانات بعد. ولّد ٣ نماذج استرشادية من البنك، أو ابدأ امتحاناً فارغاً واسحب الأسئلة بنفسك.</div>') + '</div>';
-    M.qs('#ex-new', main).onclick = function () {
-      if (!S.subjects.length) return M.toast('أضف مادة أولاً', 'bad');
-      M.modal({ title: 'امتحان جديد', body: '<div class="field"><label for="xn-s">المادة</label><select id="xn-s" class="inp">' + S.subjects.map(function (s) { return '<option value="' + s.id + '">' + esc(s.name) + '</option>'; }).join('') + '</select></div>',
-        foot: '<button class="btn pri" data-ok>إنشاء</button><button class="btn" data-x>إلغاء</button>',
-        onMount: function (m, close) { M.qs('[data-ok]', m).onclick = function () { var e = M.newExam(M.qs('#xn-s', m).value); M.save('exams', e).then(function () { close(); M.go('#/exam/' + e.id); }); }; } });
-    };
+    main.innerHTML = M.topbar('الامتحانات', n(list.length) + ' ورقة', '<button class="btn pri" id="ex-new">' + I('plus') + ' امتحان جديد</button>') +
+      '<div class="content">' + (rows || '<div class="empty">لا توجد امتحانات بعد — اضغط «امتحان جديد» واختر: من بنك الأسئلة أو كتابة يدوية.</div>') + '</div>';
+    M.qs('#ex-new', main).onclick = function () { M.newExamWizard(); };
+  };
+
+  /* ===== معالج امتحان جديد: من البنك (تلقائي أو اختيار يدوي) أو كتابة يدوية ===== */
+  M.newExamWizard = function (preMode) {
+    var mode = preMode || '';
+    var subjOpts = S.subjects.map(function (s) { return '<option value="' + s.id + '">' + esc(s.name) + (s.className ? ' — ' + esc(s.className) : '') + '</option>'; }).join('');
+    var card = function (k, icon, t, d) { return '<button type="button" class="path-card' + (mode === k ? ' on' : '') + '" data-mode="' + k + '"><span class="pc-ic">' + I(icon, 26) + '</span><b>' + t + '</b><span>' + d + '</span></button>'; };
+    M.modal({ title: 'امتحان جديد', wide: true,
+      body: '<div class="path-grid">' +
+        card('auto', 'spark', 'من البنك — تلقائياً', 'حدّد الدروس وهيكل الورقة، ويولّد التطبيق حتى ٣ نماذج متكافئة من الأسئلة المعتمدة') +
+        card('bank', 'bank', 'من البنك — أختار بنفسي', 'أضيف الأسئلة الرئيسية وأختار فروعها من البنك، وأتحكم في الدرجات والترتيب') +
+        card('manual', 'edit', 'يدوي — أكتب الأسئلة', 'أختار نوع كل سؤال وأكتبه مباشرة في الورقة (فرع واحد أو أجزاء أ، ب)، مع الرسومات والدرجات') + '</div>' +
+        '<div id="nw-sub" class="grid2" style="margin-top:14px;display:none"><div class="field"><label for="nw-s">المادة</label><select id="nw-s" class="inp">' + subjOpts + '<option value="__other">مادة أخرى — أكتب اسمها</option></select></div>' +
+        '<div class="field" id="nw-on-f" style="display:none"><label for="nw-on">اسم المادة</label><input id="nw-on" class="inp"></div>' +
+        '<div class="field"><label for="nw-t">اسم الامتحان</label><input id="nw-t" class="inp" list="nw-tl" value="' + esc(EXAM_TITLES[0]) + '"><datalist id="nw-tl">' + EXAM_TITLES.map(function (t) { return '<option value="' + esc(t) + '">'; }).join('') + '</datalist></div></div>',
+      foot: '<button class="btn pri" data-ok disabled>متابعة</button><button class="btn" data-x>إلغاء</button>',
+      onMount: function (m, close) {
+        var ok = M.qs('[data-ok]', m), sub = M.qs('#nw-sub', m), sel = M.qs('#nw-s', m);
+        var sync = function () {
+          M.qsa('[data-mode]', m).forEach(function (b) { b.classList.toggle('on', b.dataset.mode === mode); });
+          sub.style.display = mode && mode !== 'auto' ? '' : 'none';
+          M.qs('#nw-on-f', m).style.display = sel.value === '__other' ? '' : 'none';
+          ok.disabled = !mode; ok.textContent = mode === 'auto' ? 'متابعة إلى التوليد' : 'إنشاء الامتحان';
+        };
+        if (!S.subjects.length) sel.value = '__other';
+        M.qsa('[data-mode]', m).forEach(function (b) { b.onclick = function () { mode = b.dataset.mode; if (mode === 'auto' && !S.subjects.length) { M.toast('التوليد التلقائي يحتاج مادة وأسئلة معتمدة في البنك', 'bad'); mode = ''; } sync(); }; });
+        sel.onchange = sync; sync();
+        ok.onclick = function () {
+          if (mode === 'auto') { close(); M.go('#/gen'); return; }
+          var sid = sel.value === '__other' ? '' : sel.value, sname = M.qs('#nw-on', m).value.trim();
+          if (!sid && !sname) return M.toast('اختر المادة أو اكتب اسمها', 'bad');
+          var e = M.newExam(sid); e.mode = mode; e.title = M.qs('#nw-t', m).value.trim() || e.title;
+          if (!sid) e.subjectName = sname;
+          e.sections = [];
+          M.save('exams', e).then(function () { close(); M.go('#/exam/' + e.id + '?step=questions'); });
+        };
+      } });
   };
 
   /* ===== توليد النماذج ===== */
@@ -148,11 +181,12 @@
     var notApproved = 0, broken = 0, missing = 0;
     e.sections.forEach(function (s) {
       if (!s.items.length) out.push({ k: 'warn', t: 'السؤال «' + (s.title || M.TYPE[s.type].label) + '» بلا فروع' });
-      s.items.forEach(function (it) { var q = M.examQ(e, it.qid); if (!q) { missing++; return; } if (q.status !== 'approved' && !(e.frozen && e.frozen[q.id])) notApproved++; if (M.validateQuestion(q).length) broken++; });
+      s.items.forEach(function (it) { var q = M.examQ(e, it.qid); if (!q) { missing++; return; } var loc = e.local && e.local[q.id]; if (!loc && q.status !== 'approved' && !(e.frozen && e.frozen[q.id])) notApproved++; if (M.validateQuestion(q).length) broken++; });
     });
     if (missing) out.push({ k: 'bad', t: n(missing) + ' فرع محذوف من البنك' });
     if (notApproved) out.push({ k: 'warn', t: n(notApproved) + ' فرع غير معتمد في البنك' });
     if (broken) out.push({ k: 'bad', t: n(broken) + ' فرع ناقص البيانات (إجابة صحيحة أو نموذج إجابة)' });
+    if (e.mode === 'manual') { if (!e.docId && !M.docFor('exam')) out.push({ k: 'warn', t: 'لم تُحدد وثيقة جودة للورقة (تُضاف من «وثائق الجودة»)' }); return out; }
     var d = M.specData(e);
     d.levelGrades.forEach(function (g, i) { var pct = d.total ? g / d.total * 100 : 0; if (Math.abs(pct - d.targets[i]) > 10) out.push({ k: 'warn', t: 'مستوى «' + M.LEVELS[i] + '» ' + n(Math.round(pct)) + '٪ والمستهدف ' + n(d.targets[i]) + '٪' }); });
     d.rows.forEach(function (r) { if (r.actual === 0) out.push({ k: 'warn', t: 'درس «' + r.lesson.name + '» في النطاق بلا أسئلة' }); else if (r.targetGrade && Math.abs(r.actual - r.targetGrade) / r.targetGrade > 0.5 && Math.abs(r.actual - r.targetGrade) >= 2) out.push({ k: 'warn', t: 'درس «' + r.lesson.name + '» درجته ' + n(r.actual) + ' والمستهدف حسب الحصص ' + n(Math.round(r.targetGrade * 10) / 10) }); });
@@ -168,7 +202,7 @@
     if (!stored) { main.innerHTML = M.topbar('امتحان', '', '', '#/exams') + '<div class="content"><div class="empty">الامتحان غير موجود</div></div>'; return; }
     var e = JSON.parse(JSON.stringify(stored));
     var step = r.q.step || 'questions';
-    var openSec = 0, view = 'paper', pageIdx = 0;
+    var openSec = r.q.sec != null ? Number(r.q.sec) : 0, view = 'paper', pageIdx = 0;
     var locked = e.status === 'approved';
     var siblings = e.groupId ? S.exams.filter(function (x) { return x.groupId === e.groupId; }).sort(function (a, b) { return String(a.model).localeCompare(String(b.model), 'ar'); }) : [e];
     var sub = M.byId('subjects', e.subjectId) || {};
@@ -193,7 +227,10 @@
         '<div class="field"><label for="e-total">الدرجة الكلية المطلوبة (للمطابقة)</label><input id="e-total" class="inp" inputmode="numeric" data-en="totalGrade" value="' + n(e.totalGrade || '') + '" placeholder="' + n(M.examTotal(e)) + '"></div>' +
         '<div class="field"><label for="e-max">الحد الأقصى للصفحات</label><input id="e-max" class="inp" inputmode="numeric" data-en="maxPages" value="' + n(e.maxPages || '') + '"></div>' +
         '<div class="field"><label for="e-doc">وثيقة الجودة (الترويسة)</label><select id="e-doc" class="inp" data-e="docId"><option value="">— الافتراضية —</option>' + docs.map(function (d) { return '<option value="' + d.id + '"' + (d.id === e.docId ? ' selected' : '') + '>' + esc(d.name + ' (' + d.code + ' — إصدار ' + d.version + ')') + '</option>'; }).join('') + '</select></div>' +
-        '<div class="field"><label for="e-prep">إعداد</label><input id="e-prep" class="inp" data-e="preparedBy" value="' + esc(e.preparedBy || '') + '"></div>' +
+        '<div class="field"><label for="e-date">تاريخ الامتحان (يُطبع في البيانات — اتركه فارغاً ليُكتب باليد)</label><input id="e-date" class="inp" type="date" data-e="examDate" value="' + esc(e.examDate || '') + '"></div>' +
+        (!M.byId('subjects', e.subjectId) ? '<div class="field"><label for="e-sn">المادة</label><input id="e-sn" class="inp" data-e="subjectName" value="' + esc(e.subjectName || '') + '"></div>' : '') +
+        '<div class="field" style="grid-column:1/-1"><label for="e-foot">جملة أسفل كل صفحة</label><input id="e-foot" class="inp" data-e="footerNote" value="' + esc(e.footerNote != null ? e.footerNote : 'مع أطيب التمنيات بالنجاح والتوفيق') + '" placeholder="مثال: مع أطيب التمنيات بالنجاح والتوفيق"></div>' +
+        '<div class="field"><label for="e-prep">إعداد (للسجلات — لا يُطبع)</label><input id="e-prep" class="inp" data-e="preparedBy" value="' + esc(e.preparedBy || '') + '"></div>' +
         '<div class="field"><label for="e-rev">مراجعة</label><input id="e-rev" class="inp" data-e="reviewedBy" value="' + esc(e.reviewedBy || '') + '"></div>' +
         '<div class="field"><label for="e-app">اعتماد</label><input id="e-app" class="inp" data-e="approvedBy" value="' + esc(e.approvedBy || '') + '"></div></div>' +
         '<div class="field"><label for="e-ins">التعليمات</label><input id="e-ins" class="inp" data-e="instructions" value="' + esc(e.instructions || '') + '"></div>' +
@@ -201,31 +238,93 @@
     }
 
     function sectionsHTML() {
-      var h = '<div class="row"><h2 class="grow" style="flex:1">أسئلة الورقة</h2><span class="chip">' + n(e.sections.length) + ' أسئلة · مجموع ' + n(M.examTotal(e)) + (e.totalGrade ? ' من ' + n(e.totalGrade) : '') + '</span></div>';
+      var si = M.secInfo(e), manual = e.mode === 'manual';
+      var h = '<div class="row"><h2 class="grow" style="flex:1">أسئلة الورقة</h2><span class="chip">' + n(si.groups.length) + ' أسئلة · مجموع ' + n(M.examTotal(e)) + (e.totalGrade ? ' من ' + n(e.totalGrade) : '') + '</span></div>';
+      if (!e.sections.length) h += '<div class="empty">' + (manual ? 'اختر نوع السؤال الأول من الأسفل، ثم اكتب فروعه.' : 'أضف سؤالاً رئيسياً من الأسفل، ثم اختر فروعه من البنك أو اكتبها.') + '</div>';
       e.sections.forEach(function (s, i) {
-        var open = i === openSec;
-        h += '<div class="sec' + (open ? ' open' : '') + '"><div class="sec-h" data-open="' + i + '"><span class="sec-n">' + n(i + 1) + '</span><div style="flex:1;min-width:0"><div class="bold">' + esc(s.title || M.TYPE[s.type].title) + '</div><div class="small muted">' + M.TYPE[s.type].label + ' · ' + n(s.items.length) + ' فرع</div></div><span class="chip">' + esc(M.toArabic(M.gradeWord(M.sectionGrade(e, s)))) + '</span>' + I(open ? 'up' : 'down', 16) + '</div>';
+        var open = i === openSec, inf = si.info[i];
+        var lbl = 'السؤال ' + M.ordinal(inf.main) + (inf.hasParts ? ' — الجزء (' + M.partLabel(e, inf.part) + ')' : '');
+        h += '<div class="sec' + (open ? ' open' : '') + (s.part && i > 0 ? ' is-part' : '') + '"><div class="sec-h" data-open="' + i + '"><span class="sec-n">' + n(inf.main + 1) + (inf.hasParts ? '<small>' + M.partLabel(e, inf.part) + '</small>' : '') + '</span><div style="flex:1;min-width:0"><div class="small muted">' + lbl + '</div><div class="bold">' + esc(s.title || M.TYPE[s.type].title) + '</div><div class="small muted">' + M.TYPE[s.type].label + ' · ' + (s.items.length === 1 ? 'فرع واحد' : n(s.items.length) + ' فرع') + '</div></div><span class="chip">' + esc(M.toArabic(M.gradeWord(M.sectionGrade(e, s)))) + '</span>' + I(open ? 'up' : 'down', 16) + '</div>';
         if (open) {
-          h += '<div class="sec-b"><div class="grid2"><div class="field"><label for="s-t' + i + '">عنوان السؤال في الورقة</label><input id="s-t' + i + '" class="inp paper-font" data-st="' + i + '" value="' + esc(s.title || '') + '" placeholder="' + esc(M.TYPE[s.type].title) + '"></div>' +
-            '<div class="field"><label for="s-g' + i + '">درجة موحدة لكل فرع (اختياري)</label><input id="s-g' + i + '" class="inp" inputmode="decimal" data-sg="' + i + '" placeholder="من البنك"></div></div>' +
-            (s.type === 'complete' ? '<label class="check"><input type="checkbox" data-wb="' + i + '"' + (s.wordBank !== false ? ' checked' : '') + '> إظهار بنك الكلمات في برواز</label>' : '') +
-            (s.type === 'mcq' ? '<label class="check"><input type="checkbox" data-two="' + i + '"' + (s.layout === 'two' ? ' checked' : '') + '> فرعان في كل سطر (توفير مساحة)</label>' : '');
+          h += '<div class="sec-b">' +
+            (inf.hasParts && inf.first ? '<div class="field"><label for="s-mt' + i + '">نص السؤال الرئيسي (فوق الأجزاء)</label><input id="s-mt' + i + '" class="inp paper-font" data-smt="' + i + '" value="' + esc(s.mainTitle || '') + '" placeholder="أجب عن الأسئلة الآتية:"></div>' : '') +
+            '<div class="grid2"><div class="field"><label for="s-t' + i + '">عنوان ' + (inf.hasParts ? 'الجزء' : 'السؤال') + ' في الورقة</label><input id="s-t' + i + '" class="inp paper-font" data-st="' + i + '" value="' + esc(s.title || '') + '" placeholder="' + esc(M.TYPE[s.type].title) + '"></div>' +
+            '<div class="field"><label for="s-g' + i + '">درجة موحدة لكل فرع (اختياري)</label><input id="s-g' + i + '" class="inp" inputmode="decimal" data-sg="' + i + '" placeholder="' + (manual ? 'من كل فرع' : 'من البنك') + '"></div></div>' +
+            '<div class="row" style="gap:4px 16px">' + (i > 0 ? '<label class="check"><input type="checkbox" data-part="' + i + '"' + (s.part ? ' checked' : '') + '> جزء من السؤال السابق (أ، ب، ج…)</label>' : '') +
+            (s.type === 'complete' ? '<label class="check"><input type="checkbox" data-wb="' + i + '"' + (s.wordBank !== false ? ' checked' : '') + '> بنك الكلمات في برواز</label>' : '') +
+            (s.type === 'mcq' ? '<label class="check"><input type="checkbox" data-two="' + i + '"' + (s.layout === 'two' ? ' checked' : '') + '> فرعان في كل سطر</label>' : '') + '</div>';
           s.items.forEach(function (it, j) {
-            var q = M.examQ(e, it.qid);
-            var les = q ? M.lessonPath(q.lessonId).lesson : null;
+            var q = M.itemQ(e, it), loc = !!(e.local && e.local[it.qid]);
+            var les = q && q.lessonId ? M.lessonPath(q.lessonId).lesson : null;
+            var posL = { below: 'تحت', above: 'فوق', side: 'جانب يسار', 'side-start': 'جانب يمين', after: 'بعد الإجابة' };
             h += '<div class="item-row"><span class="bold">' + n(j + 1) + ')</span><div class="qt">' + (q ? M.qText(q) : '<span style="color:var(--bad)">سؤال محذوف من البنك</span>') +
-              (q ? '<div class="row small muted" style="gap:6px;margin-top:4px;font-family:Plex Arabic">' + (les ? '<span class="chip">' + esc(les.name) + '</span>' : '') + '<span class="chip info">' + M.LEVELS[q.level] + '</span>' + (q.status !== 'approved' ? M.statusChip(q.status) : '') + '</div>' : '') + '</div>' +
-              '<input class="inp" style="width:64px;min-height:36px" inputmode="decimal" data-ig="' + i + ':' + j + '" value="' + n(M.itemGrade(e, it)) + '" aria-label="درجة الفرع">' +
-              '<div class="row" style="gap:2px;flex-wrap:nowrap"><button class="btn icon ghost sm" data-iu="' + i + ':' + j + '" aria-label="لأعلى">' + I('up', 16) + '</button><button class="btn icon ghost sm" data-id="' + i + ':' + j + '" aria-label="لأسفل">' + I('down', 16) + '</button>' +
-              '<button class="btn icon ghost sm" data-ialt="' + i + ':' + j + '" aria-label="بديل من البنك" title="بديل من البنك">' + I('shuffle', 16) + '</button><button class="btn icon ghost sm" data-irm="' + i + ':' + j + '" aria-label="حذف">' + I('x', 16) + '</button></div></div>';
+              (q ? '<div class="row small muted" style="gap:6px;margin-top:4px;font-family:Plex Arabic">' + (loc ? '<span class="chip info">مكتوب في الورقة</span>' : '') + (les ? '<span class="chip">' + esc(les.name) + '</span>' : '') + (!loc ? '<span class="chip info">' + M.LEVELS[q.level] + '</span>' : '') + (!loc && q.status !== 'approved' ? M.statusChip(q.status) : '') + (q.figure ? '<span class="chip">' + I('t_image', 12) + ' شكل ' + n(Number(q.figureWidth) || 60) + '٪ · ' + posL[q.figurePos || 'below'] + '</span>' : '') + '</div>' : '') + '</div>' +
+              '<input class="inp" style="width:64px;min-height:36px" inputmode="decimal" data-ig="' + i + ':' + j + '" value="' + n(M.itemGrade(e, it)) + '" aria-label="درجة الفرع" title="درجة الفرع">' +
+              '<div class="row" style="gap:2px;flex-wrap:nowrap">' +
+              (loc ? '<button class="btn icon ghost sm" data-iedit="' + i + ':' + j + '" aria-label="تعديل" title="تعديل">' + I('edit', 16) + '</button>' : '') +
+              '<button class="btn icon ghost sm" data-ilay="' + i + ':' + j + '" aria-label="التخطيط والشكل" title="حجم الشكل وموضعه ومساحة الإجابة والدرجة">' + I('t_image', 16) + '</button>' +
+              '<button class="btn icon ghost sm" data-iu="' + i + ':' + j + '" aria-label="لأعلى">' + I('up', 16) + '</button><button class="btn icon ghost sm" data-id="' + i + ':' + j + '" aria-label="لأسفل">' + I('down', 16) + '</button>' +
+              (!loc ? '<button class="btn icon ghost sm" data-ialt="' + i + ':' + j + '" aria-label="بديل من البنك" title="بديل من البنك">' + I('shuffle', 16) + '</button>' : '') + '<button class="btn icon ghost sm" data-irm="' + i + ':' + j + '" aria-label="حذف">' + I('x', 16) + '</button></div></div>';
           });
-          h += '<div class="row"><button class="btn sm" data-pick="' + i + '">' + I('plus', 16) + ' إضافة فروع من البنك</button><span class="grow" style="flex:1"></span>' +
-            '<button class="btn sm ghost" data-su="' + i + '">' + I('up', 16) + ' تحريك</button><button class="btn sm ghost" data-sd="' + i + '">' + I('down', 16) + '</button><button class="btn sm danger" data-srm="' + i + '">' + I('trash', 16) + ' حذف السؤال</button></div></div>';
+          h += '<div class="row"><button class="btn sm pri" data-write="' + i + '">' + I('edit', 16) + ' كتابة فرع</button><button class="btn sm" data-pick="' + i + '">' + I('plus', 16) + ' من البنك</button><button class="btn sm" data-addpart="' + i + '">' + I('plus', 16) + ' إضافة جزء (' + M.partLabel(e, inf.hasParts ? si.groups[inf.main].secs.length : 1) + ')</button><span class="grow" style="flex:1"></span>' +
+            '<button class="btn sm ghost" data-su="' + i + '" aria-label="تحريك لأعلى">' + I('up', 16) + '</button><button class="btn sm ghost" data-sd="' + i + '" aria-label="تحريك لأسفل">' + I('down', 16) + '</button><button class="btn sm danger" data-srm="' + i + '">' + I('trash', 16) + ' حذف</button></div></div>';
         }
         h += '</div>';
       });
-      h += '<div class="card"><h3 style="margin-bottom:10px">أضف سؤالاً رئيسياً</h3><div class="types">' + M.TYPES.map(function (t) { return '<button type="button" data-addsec="' + t.id + '">' + I('t_' + t.id, 22) + t.label + '</button>'; }).join('') + '</div></div>';
+      h += '<div class="card"><h3 style="margin-bottom:4px">أضف سؤالاً رئيسياً</h3><div class="small muted" style="margin-bottom:10px">اختر نوعه — ' + (manual ? 'ثم اكتب فروعه مباشرة' : 'ثم اختر فروعه من البنك أو اكتبها') + '. لسؤال له أجزاء (أ، ب) استخدم «إضافة جزء» داخل السؤال.</div><div class="types">' + M.TYPES.map(function (t) { return '<button type="button" data-addsec="' + t.id + '">' + I('t_' + t.id, 22) + t.label + '</button>'; }).join('') + '</div></div>';
       return h;
+    }
+
+    /* حفظ فوري قبل مغادرة المحرر لكتابة سؤال */
+    function flush() { return M.save('exams', JSON.parse(JSON.stringify(e)), { log: false }); }
+    function writeItem(si2, qid) { flush().then(function () { M.go('#/q/' + (qid || 'new') + '?exam=' + e.id + '&sec=' + si2 + (qid ? '' : '&type=' + e.sections[si2].type)); }); }
+    function typePicker(title, cb) {
+      M.modal({ title: title, body: '<div class="types">' + M.TYPES.map(function (t) { return '<button type="button" data-t="' + t.id + '">' + I('t_' + t.id, 22) + t.label + '</button>'; }).join('') + '</div>',
+        onMount: function (m, close) { M.qsa('[data-t]', m).forEach(function (b) { b.onclick = function () { close(); cb(b.dataset.t); }; }); } });
+    }
+    /* تخطيط الفرع في هذه الورقة: حجم الشكل وموضعه ومحاذاته وتعليقه + مساحة الإجابة + الدرجة */
+    function layoutDialog(si2, j) {
+      var it = e.sections[si2].items[j], q = M.itemQ(e, it); if (!q) return;
+      var base = M.examQ(e, it.qid);
+      var L = Object.assign({}, it.lay || {});
+      var cur = function (k, d) { return L[k] != null && L[k] !== '' ? L[k] : (base[k] != null && base[k] !== '' ? base[k] : d); };
+      var pos = [['below', 'تحت السؤال'], ['above', 'فوق السؤال'], ['side', 'بجانبه — يسار'], ['side-start', 'بجانبه — يمين'], ['after', 'بعد مساحة الإجابة']];
+      var al = [['start', 'يمين'], ['center', 'وسط'], ['end', 'يسار']];
+      var hasLines = ['reason', 'essay', 'problem'].indexOf(q.type) >= 0, hasDraw = q.type === 'draw';
+      M.modal({ title: 'تخطيط الفرع في الورقة', wide: true,
+        body: '<div class="lay-grid"><div style="display:flex;flex-direction:column;gap:12px">' +
+          (q.figure ? '<div class="field"><label for="ly-w">عرض الشكل: <b id="ly-wv">' + n(cur('figureWidth', 60)) + '٪</b></label><input id="ly-w" type="range" min="15" max="100" step="5" value="' + cur('figureWidth', 60) + '"></div>' +
+            '<div class="field"><span class="lbl">موضع الشكل</span><div class="seg wrap" id="ly-pos">' + pos.map(function (p) { return '<button type="button" data-v="' + p[0] + '" class="' + (cur('figurePos', 'below') === p[0] ? 'on' : '') + '">' + p[1] + '</button>'; }).join('') + '</div></div>' +
+            '<div class="field"><span class="lbl">محاذاة الشكل</span><div class="seg" id="ly-al">' + al.map(function (p) { return '<button type="button" data-v="' + p[0] + '" class="' + (cur('figureAlign', 'center') === p[0] ? 'on' : '') + '">' + p[1] + '</button>'; }).join('') + '</div></div>' +
+            '<div class="field"><label for="ly-cap">تعليق تحت الشكل (اختياري)</label><input id="ly-cap" class="inp paper-font" value="' + esc(cur('figureCaption', '')) + '" placeholder="مثال: شكل (١)"></div>'
+            : '<div class="alert info">' + I('t_image') + '<div>لا يوجد شكل في هذا الفرع. ' + (e.local && e.local[it.qid] ? 'أضفه من زر «تعديل».' : 'يُضاف الشكل من محرر السؤال في البنك.') + '</div></div>') +
+          (hasLines ? '<div class="field"><label for="ly-l">سطور الإجابة</label><input id="ly-l" class="inp" inputmode="numeric" value="' + n(cur('lines', 3)) + '"></div>' : '') +
+          (hasDraw ? '<div class="field"><label for="ly-d">ارتفاع مساحة الرسم (بكسل)</label><input id="ly-d" class="inp" inputmode="numeric" value="' + n(cur('drawHeight', 140)) + '"></div>' : '') +
+          '<div class="field"><label for="ly-g">درجة الفرع</label><input id="ly-g" class="inp" inputmode="decimal" value="' + n(M.itemGrade(e, it)) + '"></div>' +
+          '<button type="button" class="btn sm ghost" id="ly-reset" style="align-self:flex-start">الرجوع لإعدادات السؤال الأصلية</button></div>' +
+          '<div class="lay-pv"><div class="small muted" style="margin-bottom:6px">معاينة</div><div id="ly-pv"></div></div></div>',
+        foot: '<button class="btn pri" data-ok>تطبيق</button><button class="btn" data-x>إلغاء</button>',
+        onMount: function (m, close) {
+          var pv = function () {
+            var qq = Object.assign({}, base); M.LAY_KEYS.forEach(function (k) { if (L[k] != null && L[k] !== '') qq[k] = L[k]; });
+            M.qs('#ly-pv', m).innerHTML = M.renderQuestionPreview(qq, e.digits || 'arabic');
+          };
+          var w = M.qs('#ly-w', m);
+          var setW = function (v) { L.figureWidth = v; if (w) { w.value = v; M.qs('#ly-wv', m).textContent = n(v) + '٪'; } };
+          if (w) w.oninput = function () { setW(Number(w.value)); pv(); };
+          M.qsa('#ly-pos button', m).forEach(function (b) { b.onclick = function () { L.figurePos = b.dataset.v; M.qsa('#ly-pos button', m).forEach(function (x) { x.classList.toggle('on', x === b); }); if ((b.dataset.v === 'side' || b.dataset.v === 'side-start') && Number(cur('figureWidth', 60)) > 50) setW(40); pv(); }; });
+          M.qsa('#ly-al button', m).forEach(function (b) { b.onclick = function () { L.figureAlign = b.dataset.v; M.qsa('#ly-al button', m).forEach(function (x) { x.classList.toggle('on', x === b); }); pv(); }; });
+          var cp = M.qs('#ly-cap', m); if (cp) cp.oninput = function () { L.figureCaption = cp.value; pv(); };
+          var ln = M.qs('#ly-l', m); if (ln) ln.oninput = function () { L.lines = Math.max(0, Math.min(30, Number(M.toWestern(ln.value)) || 0)); pv(); };
+          var dh = M.qs('#ly-d', m); if (dh) dh.oninput = function () { L.drawHeight = Math.max(40, Math.min(900, Number(M.toWestern(dh.value)) || 140)); pv(); };
+          M.qs('#ly-reset', m).onclick = function () { close(); it.lay = null; changed(); };
+          M.qs('[data-ok]', m).onclick = function () {
+            var gv = String(M.qs('#ly-g', m).value).trim(), g = Number(M.toWestern(gv));
+            if (gv !== '' && g >= 0) it.grade = g;
+            it.lay = Object.keys(L).length ? L : null; close(); changed();
+          };
+          pv();
+        } });
     }
 
     function formatHTML() {
@@ -344,6 +443,7 @@
       ne.sections.forEach(function (s) {
         s.id = M.uid();
         s.items = s.items.map(function (it) {
+          if (e.local && e.local[it.qid]) return it;
           var q = M.examQ(e, it.qid);
           var cands = S.questions.filter(function (c) { return c.type === s.type && c.status === 'approved' && !used[c.id] && lessonIds.indexOf(c.lessonId) >= 0; });
           cands.sort(function (a, b) { var sa = (a.lessonId === (q && q.lessonId) ? 0 : 2) + (Number(a.level) === Number(q && q.level) ? 0 : 1); var sb = (b.lessonId === (q && q.lessonId) ? 0 : 2) + (Number(b.level) === Number(q && q.level) ? 0 : 1); return sa - sb; });
@@ -383,26 +483,39 @@
         onMount: function (m, close) { M.qsa('[data-alt]', m).forEach(function (b) { b.onclick = function () { it.qid = b.dataset.alt; close(); changed(); }; }); } });
     }
 
+    var rememberFoot = M.debounce(function (v) { M.setSetting('footerNote', v); }, 800);
     function parseIJ(v) { var p = v.split(':'); return [Number(p[0]), Number(p[1])]; }
     function bindSide() {
       var box = M.qs('#ex-side', main);
-      M.qsa('[data-e]', box).forEach(function (el) { el.oninput = el.onchange = function () { e[el.dataset.e] = el.value; changed2(); }; });
+      M.qsa('[data-e]', box).forEach(function (el) { el.oninput = el.onchange = function () { e[el.dataset.e] = el.value; if (el.dataset.e === 'footerNote') rememberFoot(el.value); changed2(); }; });
       M.qsa('[data-en]', box).forEach(function (el) { el.oninput = function () { var v = Number(M.toWestern(el.value)); e[el.dataset.en] = v > 0 ? v : ''; changed2(); }; });
       M.qsa('[data-open]', box).forEach(function (el) { el.onclick = function () { var i = Number(el.dataset.open); openSec = openSec === i ? -1 : i; drawSide(); }; });
       M.qsa('[data-st]', box).forEach(function (el) { el.oninput = function () { e.sections[+el.dataset.st].title = el.value; changed2(); }; });
+      M.qsa('[data-smt]', box).forEach(function (el) { el.oninput = function () { e.sections[+el.dataset.smt].mainTitle = el.value; changed2(); }; });
+      M.qsa('[data-part]', box).forEach(function (el) { el.onchange = function () { e.sections[+el.dataset.part].part = el.checked; changed(); }; });
+      M.qsa('[data-write]', box).forEach(function (el) { el.onclick = function () { writeItem(+el.dataset.write); }; });
+      M.qsa('[data-iedit]', box).forEach(function (el) { el.onclick = function () { var ij = parseIJ(el.dataset.iedit); writeItem(ij[0], e.sections[ij[0]].items[ij[1]].qid); }; });
+      M.qsa('[data-ilay]', box).forEach(function (el) { el.onclick = function () { var ij = parseIJ(el.dataset.ilay); layoutDialog(ij[0], ij[1]); }; });
+      M.qsa('[data-addpart]', box).forEach(function (el) { el.onclick = function () {
+        var i = +el.dataset.addpart, si = M.secInfo(e), g = si.groups[si.info[i].main], at = g.secs[g.secs.length - 1] + 1;
+        typePicker('نوع الجزء (' + M.partLabel(e, g.secs.length) + ')', function (t) {
+          e.sections.splice(at, 0, { id: M.uid(), type: t, title: '', items: [], part: true, wordBank: true, layout: 'auto' });
+          openSec = at; changed();
+        });
+      }; });
       M.qsa('[data-sg]', box).forEach(function (el) { el.onchange = function () { var v = Number(M.toWestern(el.value)); if (v > 0) { e.sections[+el.dataset.sg].items.forEach(function (it) { it.grade = v; }); changed(); } }; });
       M.qsa('[data-wb]', box).forEach(function (el) { el.onchange = function () { e.sections[+el.dataset.wb].wordBank = el.checked; changed2(); }; });
       M.qsa('[data-two]', box).forEach(function (el) { el.onchange = function () { e.sections[+el.dataset.two].layout = el.checked ? 'two' : 'auto'; changed2(); }; });
       M.qsa('[data-ig]', box).forEach(function (el) { el.onchange = function () { var ij = parseIJ(el.dataset.ig); var v = Number(M.toWestern(el.value)); e.sections[ij[0]].items[ij[1]].grade = v >= 0 ? v : null; changed(); }; });
       M.qsa('[data-iu]', box).forEach(function (el) { el.onclick = function () { var ij = parseIJ(el.dataset.iu), a = e.sections[ij[0]].items; if (ij[1] > 0) { var t = a[ij[1]]; a[ij[1]] = a[ij[1] - 1]; a[ij[1] - 1] = t; changed(); } }; });
       M.qsa('[data-id]', box).forEach(function (el) { el.onclick = function () { var ij = parseIJ(el.dataset.id), a = e.sections[ij[0]].items; if (ij[1] < a.length - 1) { var t = a[ij[1]]; a[ij[1]] = a[ij[1] + 1]; a[ij[1] + 1] = t; changed(); } }; });
-      M.qsa('[data-irm]', box).forEach(function (el) { el.onclick = function () { var ij = parseIJ(el.dataset.irm); e.sections[ij[0]].items.splice(ij[1], 1); changed(); }; });
+      M.qsa('[data-irm]', box).forEach(function (el) { el.onclick = function () { var ij = parseIJ(el.dataset.irm); var rm = e.sections[ij[0]].items.splice(ij[1], 1)[0]; if (rm && e.local && e.local[rm.qid]) delete e.local[rm.qid]; changed(); }; });
       M.qsa('[data-ialt]', box).forEach(function (el) { el.onclick = function () { var ij = parseIJ(el.dataset.ialt); altDialog(ij[0], ij[1]); }; });
       M.qsa('[data-pick]', box).forEach(function (el) { el.onclick = function () { pickDialog(+el.dataset.pick); }; });
       M.qsa('[data-su]', box).forEach(function (el) { el.onclick = function () { var i = +el.dataset.su; if (i > 0) { var t = e.sections[i]; e.sections[i] = e.sections[i - 1]; e.sections[i - 1] = t; openSec = i - 1; changed(); } }; });
       M.qsa('[data-sd]', box).forEach(function (el) { el.onclick = function () { var i = +el.dataset.sd; if (i < e.sections.length - 1) { var t = e.sections[i]; e.sections[i] = e.sections[i + 1]; e.sections[i + 1] = t; openSec = i + 1; changed(); } }; });
       M.qsa('[data-srm]', box).forEach(function (el) { el.onclick = function () { var i = +el.dataset.srm; M.confirm('حذف السؤال', 'حذف «' + (e.sections[i].title || M.TYPE[e.sections[i].type].label) + '» من الورقة؟ (الأسئلة تبقى في البنك)', 'حذف', true).then(function (ok) { if (ok) { e.sections.splice(i, 1); openSec = -1; changed(); } }); }; });
-      M.qsa('[data-addsec]', box).forEach(function (el) { el.onclick = function () { e.sections.push({ id: M.uid(), type: el.dataset.addsec, title: '', items: [], wordBank: true, layout: 'auto' }); openSec = e.sections.length - 1; changed(); pickDialog(openSec); }; });
+      M.qsa('[data-addsec]', box).forEach(function (el) { el.onclick = function () { e.sections.push({ id: M.uid(), type: el.dataset.addsec, title: '', items: [], wordBank: true, layout: 'auto' }); openSec = e.sections.length - 1; changed(); if (e.mode === 'manual') writeItem(openSec); else pickDialog(openSec); }; });
       /* التنسيق */
       M.qsa('#fm-dg button', box).forEach(function (b) { b.onclick = function () { e.digits = b.dataset.v; M.qsa('#pv-dg button', main).forEach(function (x) { x.classList.toggle('on', x.dataset.v === e.digits); }); changed(); }; });
       M.qsa('#fm-lang button', box).forEach(function (b) { b.onclick = function () { e.lang = b.dataset.v; if (e.lang === 'en') e.digits = 'english'; changed(); }; });

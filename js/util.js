@@ -259,6 +259,8 @@ window.M = window.M || {};
     back: '<path d="M9 6l6 6-6 6"/>',
     file: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/>',
     lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>',
+    finger: '<path d="M12 11v3a8 8 0 01-1.2 4.2"/><path d="M8.5 8.4A4 4 0 0116 10v2.5a12 12 0 01-.7 4"/><path d="M5.6 6.2A8 8 0 0120 10.5V12"/><path d="M4 11v1.5a8 8 0 01-.6 3"/><path d="M8.2 13a10 10 0 01-1.6 5.5"/><path d="M19.6 15.5a16 16 0 01-.9 3.5"/><path d="M14.6 14.4a14 14 0 01-1.3 5.6"/>',
+    grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
     /* أنواع الأسئلة */
     t_mcq: '<circle cx="6" cy="7" r="2.5"/><circle cx="6" cy="17" r="2.5"/><path d="M12 7h8M12 17h8"/>',
     t_tf: '<path d="M3 12l4 4 6-8"/><path d="M15 9l6 6M21 9l-6 6"/>',

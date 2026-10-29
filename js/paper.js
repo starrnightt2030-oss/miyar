@@ -3,9 +3,32 @@
   'use strict';
 
   M.examQ = function (exam, qid) {
+    if (exam.local && exam.local[qid]) return exam.local[qid]; /* سؤال مكتوب يدوياً داخل الامتحان */
     if (exam.frozen && exam.frozen[qid]) return exam.frozen[qid];
     return M.byId('questions', qid);
   };
+  /* السؤال كما يظهر في هذه الورقة: إعدادات التخطيط الخاصة بالفرع (حجم الشكل وموضعه…) فوق بيانات السؤال */
+  M.LAY_KEYS = ['figureWidth', 'figurePos', 'figureAlign', 'figureCaption', 'lines', 'drawHeight'];
+  M.itemQ = function (exam, it) {
+    var q = M.examQ(exam, it.qid); if (!q || !it.lay) return q;
+    var o = Object.assign({}, q);
+    M.LAY_KEYS.forEach(function (k) { if (it.lay[k] != null && it.lay[k] !== '') o[k] = it.lay[k]; });
+    return o;
+  };
+  /* الأسئلة الرئيسية وأجزاؤها (أ، ب، ج): القسم الذي عليه part=true جزء من السؤال الرئيسي السابق */
+  M.secInfo = function (exam) {
+    var info = [], groups = [];
+    exam.sections.forEach(function (s, i) {
+      if (!(s.part && i > 0)) groups.push({ start: i, secs: [] });
+      groups[groups.length - 1].secs.push(i);
+      info.push({ main: groups.length - 1 });
+    });
+    info.forEach(function (o, i) { var g = groups[o.main]; o.hasParts = g.secs.length > 1; o.part = o.hasParts ? g.secs.indexOf(i) : -1; o.first = g.secs[0] === i; });
+    return { info: info, groups: groups };
+  };
+  M.examSubject = function (exam) { var s = M.byId('subjects', exam.subjectId); return s ? s.name : (exam.subjectName || ''); };
+  M.groupGrade = function (exam, g) { return g.secs.reduce(function (t, i) { return t + M.sectionGrade(exam, exam.sections[i]); }, 0); };
+  M.partLabel = function (exam, k) { return exam.lang === 'en' ? 'abcdefgh'.charAt(k) : M.AR_LETTERS[k]; };
   M.itemGrade = function (exam, it) {
     if (it.grade != null && it.grade !== '') return Number(it.grade);
     var q = M.examQ(exam, it.qid); return q ? Number(q.grade) || 0 : 0;
@@ -22,7 +45,7 @@
     var mode = exam.digits || 'arabic';
     var T = function (s) { return M.digits(M.esc(s), mode); };
     return {
-      exam: exam, en: en, mode: mode, T: T,
+      exam: exam, en: en, mode: mode, T: T, si: M.secInfo(exam),
       L: en ? M.EN_LETTERS : M.AR_LETTERS,
       num: function (n) { return M.digits(String(n), mode); },
       rich: function (s) {
@@ -51,46 +74,59 @@
       '<div class="c1">' + logo + '<div><b>' + (c.T(cen.name) || '[اسم مركز التدريب]') + '</b>' +
       (cen.directorate ? '<span>' + c.T(cen.directorate) + '</span>' : '') + (cen.address ? '<span>' + c.T(cen.address) + '</span>' : '') + '</div></div>' +
       '<div class="c2"><span class="t1">' + c.T(e.title || 'امتحان') + (e.model ? ' — نموذج (' + c.T(e.model) + ')' : '') + '</span>' +
-      '<span class="t2">مادة ' + c.T(subject ? subject.name : '') + (e.className ? ' — ' + c.T(e.className) : '') + '</span>' +
-      (e.specialization ? '<span class="t3">' + c.T(e.specialization) + '</span>' : '') +
+      '<span class="t2">مادة ' + c.T(M.examSubject(e)) + '</span>' +
       '<span class="t3">العام الدراسي ' + c.T(e.year || M.S.settings.year) + '</span></div>' +
       '<div class="p-doc">' + docRows + '</div></div>';
   }
 
   function infoHTML(c, pagesPh) {
     var e = c.exam;
-    return '<div class="pblock p-info"><span>الزمن: <strong>' + c.T(e.duration || '') + '</strong></span>' +
-      '<span>الدرجة الكلية: <strong>' + c.T(M.gradeWord(e.totalGrade || M.examTotal(e))) + '</strong></span>' +
-      '<span>عدد الأسئلة: <strong>' + c.num(e.sections.length) + '</strong></span>' +
+    return '<div class="pblock p-info"><span>الدرجة الكلية: <strong>' + c.T(M.gradeWord(e.totalGrade || M.examTotal(e))) + '</strong></span>' +
+      '<span>عدد الأسئلة: <strong>' + c.num(c.si.groups.length) + '</strong></span>' +
       '<span>عدد الصفحات: <strong>' + pagesPh + '</strong></span></div>';
   }
 
-  function studentHTML() {
-    return '<div class="pblock p-student"><span class="nm">اسم الطالب: <i></i></span>' +
-      '<span>الفصل: <span class="p-box"></span></span>' +
-      '<span>رقم الجلوس: <span class="p-digit"></span><span class="p-digit"></span><span class="p-digit"></span><span class="p-digit"></span><span class="p-digit"></span></span></div>';
+  /* بيانات الطالب والورقة: الاسم · رقم الجلوس · الصف · التخصص · المادة · الزمن · التاريخ */
+  function studentHTML(c) {
+    var e = c.exam, subject = M.byId('subjects', e.subjectId);
+    var val = function (v) { return v ? '<b>' + c.T(v) + '</b>' : '<i class="s"></i>'; };
+    var date = e.examDate ? M.fmtDate(e.examDate) : '';
+    var digits = ''; for (var i = 0; i < (Number(e.seatDigits) || 5); i++) digits += '<span class="p-digit"></span>';
+    return '<div class="pblock p-data">' +
+      (e.showStudent !== false ? '<div class="r1"><span class="f nm"><span class="k">اسم الطالب</span><i></i></span><span class="f"><span class="k">رقم الجلوس</span>' + digits + '</span></div>' : '') +
+      '<div class="r2">' +
+      '<span class="f"><span class="k">الصف الدراسي</span>' + val(e.className) + '</span>' +
+      '<span class="f"><span class="k">التخصص</span>' + val(e.specialization) + '</span>' +
+      '<span class="f"><span class="k">المادة</span>' + val(M.examSubject(e)) + '</span>' +
+      '<span class="f"><span class="k">الزمن</span>' + val(e.duration) + '</span>' +
+      '<span class="f"><span class="k">التاريخ</span>' + (date ? '<b>' + c.num(date) + '</b>' : '<i class="s"></i>') + '</span>' +
+      '</div></div>';
   }
 
   function gradesHTML(c) {
-    var e = c.exam, n = e.sections.length;
+    var e = c.exam, G = c.si.groups, n = G.length;
     var h = '<div class="pblock p-grades" style="grid-template-columns:92px repeat(' + (n + 1) + ',minmax(0,1fr))">';
     h += '<span class="lead">السؤال</span>';
-    e.sections.forEach(function (s, i) { h += '<span class="hd">' + M.ordinal(i) + '</span>'; });
+    G.forEach(function (g, i) { h += '<span class="hd">' + M.ordinal(i) + '</span>'; });
     h += '<span class="hd tot">المجموع</span><span class="bold">الدرجة</span>';
-    e.sections.forEach(function (s) { h += '<span>' + c.num(M.sectionGrade(e, s)) + '</span>'; });
+    G.forEach(function (g) { h += '<span>' + c.num(M.groupGrade(e, g)) + '</span>'; });
     h += '<span class="tot">' + c.num(M.examTotal(e)) + '</span><span class="bold">درجة الطالب</span>';
     for (var i = 0; i <= n; i++) h += '<span></span>';
     return h + '</div>';
   }
 
   /* ===== الأقسام ===== */
+  function gradeTxt(c, g) { return c.en ? '(' + c.num(g) + ' marks)' : '(' + c.T(M.gradeWord(g)) + ')'; }
   function secHeadHTML(c, sec, idx, cont) {
-    var g = M.sectionGrade(c.exam, sec);
+    var g = M.sectionGrade(c.exam, sec), inf = c.si.info[idx], no = inf.main + 1;
     var title = sec.title || (M.TYPE[sec.type] || {}).title || '';
-    if (c.en) {
-      return '<div class="p-sec-h"><span class="n">Q' + c.num(idx + 1) + '</span><span class="t">' + c.T(title) + (cont ? ' (continued)' : '') + '</span><span class="g">(' + c.num(g) + ' marks)</span></div>';
+    if (!inf.hasParts) {
+      if (c.en) return '<div class="p-sec-h"><span class="n">Q' + c.num(no) + '</span><span class="t">' + c.T(title) + (cont ? ' (continued)' : '') + '</span><span class="g">' + gradeTxt(c, g) + '</span></div>';
+      return '<div class="p-sec-h"><span class="n">' + c.num(no) + '</span><span class="t">' + (cont ? 'تابع: ' : '') + c.T(title) + '</span><span class="g">' + gradeTxt(c, g) + '</span></div>';
     }
-    return '<div class="p-sec-h"><span class="n">' + c.num(idx + 1) + '</span><span class="t">' + (cont ? 'تابع: ' : '') + c.T(title) + '</span><span class="g">(' + c.T(M.gradeWord(g)) + ')</span></div>';
+    var grp = c.si.groups[inf.main], first = c.exam.sections[grp.start];
+    var main = inf.first && !cont ? '<div class="p-sec-h"><span class="n">' + (c.en ? 'Q' : '') + c.num(no) + '</span><span class="t">' + c.T(first.mainTitle || (c.en ? 'Answer the following:' : 'أجب عن الأسئلة الآتية:')) + '</span><span class="g">' + gradeTxt(c, M.groupGrade(c.exam, grp)) + '</span></div>' : '';
+    return main + '<div class="p-part-h"><span class="pl">(' + M.partLabel(c.exam, inf.part) + ')</span><span class="t">' + (cont ? (c.en ? '(continued) ' : 'تابع: ') : '') + c.T(title) + '</span><span class="g">' + gradeTxt(c, g) + '</span></div>';
   }
 
   function optCols(opts) {
@@ -126,11 +162,27 @@
     return M.shuffle(words, M.rng(seedFor(exam, 'bank' + sec.id)));
   };
 
+  function figBox(q, w) {
+    return '<div class="fw" style="width:' + w + '%"><img src="' + q.figure + '" alt="">' + (q.figureCaption ? '<div class="cap">' + M.esc(q.figureCaption) + '</div>' : '') + '</div>';
+  }
   function fig(q) {
     if (!q.figure) return '';
-    return '<div class="p-fig"><img src="' + q.figure + '" alt="" style="width:' + (Number(q.figureWidth) || 60) + '%"></div>';
+    return '<div class="p-fig a-' + (q.figureAlign || 'center') + '">' + figBox(q, Number(q.figureWidth) || 60) + '</div>';
   }
   M._fig = fig;
+  /* موضع الشكل: تحت السؤال (افتراضي) · فوقه · بجانبه يساراً أو يميناً · بعد مساحة الإجابة */
+  function place(q, st, rest) {
+    if (!q.figure) return st + rest;
+    var pos = q.figurePos || 'below';
+    if (pos === 'above') return fig(q) + st + rest;
+    if (pos === 'after') return st + rest + fig(q);
+    if (pos === 'side' || pos === 'side-start') {
+      var w = Math.min(55, Number(q.figureWidth) || 40);
+      return '<div class="p-fside' + (pos === 'side-start' ? ' st' : '') + '"><div class="tx">' + st + rest + '</div><div class="fx" style="width:' + w + '%">' + figBox(q, 100) + '</div></div>';
+    }
+    return st + fig(q) + rest;
+  }
+  M._place = place;
 
   function itemNo(c, n) { return '<span class="no">' + (c.en ? c.num(n) + '.' : c.num(n) + ')') + '</span>'; }
 
@@ -140,8 +192,8 @@
     if (sec.type === 'tf') {
       h += '<div class="p-tf">';
       its.forEach(function (it, k) {
-        var q = M.examQ(e, it.qid); if (!q) return;
-        h += '<span>' + c.num(from + k + 1) + '</span><span>' + c.rich(q.text) + fig(q) + '</span><span>(&nbsp;&nbsp;&nbsp;&nbsp;)</span>';
+        var q = M.itemQ(e, it); if (!q) return;
+        h += '<span>' + c.num(from + k + 1) + '</span><span>' + place(q, c.rich(q.text), '') + '</span><span>(&nbsp;&nbsp;&nbsp;&nbsp;)</span>';
       });
       return h + '</div>';
     }
@@ -160,12 +212,12 @@
     if (sec.type === 'mcq') {
       h += '<div class="p-mcq' + (sec.layout === 'two' ? ' two' : '') + '">';
       its.forEach(function (it, k) {
-        var q = M.examQ(e, it.qid); if (!q) return;
+        var q = M.itemQ(e, it); if (!q) return;
         var order = M.mcqOrder(e, sec, q);
         var opts = order.map(function (i) { return q.options[i]; });
-        h += '<div class="p-item"><div class="st">' + itemNo(c, from + k + 1) + '<span>' + c.rich(q.text) + '</span></div>' + fig(q) + '<div class="p-opts ' + (sec.layout === 'two' ? 'c2' : optCols(opts)) + '">';
-        opts.forEach(function (o, j) { h += '<span><i class="ring"></i>' + c.L[j] + ') ' + c.rich(o) + '</span>'; });
-        h += '</div></div>';
+        var oh = '<div class="p-opts ' + (sec.layout === 'two' || q.figurePos === 'side' || q.figurePos === 'side-start' ? (optCols(opts) === 'c1' ? 'c1' : 'c2') : optCols(opts)) + '">';
+        opts.forEach(function (o, j) { oh += '<span><i class="ring"></i>' + c.L[j] + ') ' + c.rich(o) + '</span>'; });
+        h += '<div class="p-item">' + place(q, '<div class="st">' + (sec.items.length === 1 ? '' : itemNo(c, from + k + 1)) + '<span>' + c.rich(q.text) + '</span></div>', oh + '</div>') + '</div>';
       });
       return h + '</div>';
     }
@@ -175,24 +227,24 @@
       if (wb.length) h += '<div class="p-bank">' + wb.map(function (w) { return '<span>' + c.rich(w) + '</span>'; }).join('') + '</div>';
     }
     its.forEach(function (it, k) {
-      var q = M.examQ(e, it.qid); if (!q) return;
-      var no = itemNo(c, from + k + 1);
+      var q = M.itemQ(e, it); if (!q) return;
+      var no = sec.items.length === 1 ? '' : itemNo(c, from + k + 1);
       if (sec.type === 'complete') {
-        h += '<div class="p-item"><div class="st">' + no + '<span>' + c.rich(q.text) + '</span></div>' + fig(q) + '</div>';
+        h += '<div class="p-item">' + place(q, '<div class="st">' + no + '<span>' + c.rich(q.text) + '</span></div>', '') + '</div>';
       } else if (sec.type === 'term') {
-        h += '<div class="p-item"><div class="st p-term">' + no + '<span>' + c.rich(q.text) + '</span><span class="tb">(…………………………)</span></div>' + fig(q) + '</div>';
+        h += '<div class="p-item">' + place(q, '<div class="st p-term">' + no + '<span>' + c.rich(q.text) + '</span><span class="tb">(…………………………)</span></div>', '') + '</div>';
       } else if (sec.type === 'image') {
         h += '<div class="p-item"><div class="st">' + no + '<span>' + c.rich(q.text) + '</span></div><div class="p-img">' +
           (q.image ? '<img src="' + q.image + '" alt="">' : '') + '<div class="lbls">' +
           q.labels.map(function (l) { return '<span>' + c.T(l.n) + '</span><span>…………………………</span>'; }).join('') + '</div></div></div>';
       } else if (sec.type === 'draw') {
-        h += '<div class="p-item"><div class="st">' + no + '<span>' + c.rich(q.text) + '</span></div>' + fig(q) +
-          '<div class="p-draw' + (q.drawGrid !== false ? ' grid' : '') + '" style="height:' + (Number(q.drawHeight) || 140) + 'px"></div></div>';
+        h += '<div class="p-item">' + place(q, '<div class="st">' + no + '<span>' + c.rich(q.text) + '</span></div>',
+          '<div class="p-draw' + (q.drawGrid !== false ? ' grid' : '') + '" style="height:' + (Number(q.drawHeight) || 140) + 'px"></div>') + '</div>';
       } else {
         var lines = Math.max(0, Number(q.lines) || 0), li = '';
         for (var i = 0; i < lines; i++) li += '<i></i>';
         var pre = sec.type === 'reason' && !/^\s*علل/.test(q.text) && !c.en ? '' : '';
-        h += '<div class="p-item"><div class="st">' + no + '<span>' + pre + c.rich(q.text) + '</span></div>' + fig(q) + (lines ? '<div class="p-lines">' + li + '</div>' : '') + '</div>';
+        h += '<div class="p-item">' + place(q, '<div class="st">' + no + '<span>' + pre + c.rich(q.text) + '</span></div>', lines ? '<div class="p-lines">' + li + '</div>' : '') + '</div>';
       }
     });
     return h;
@@ -206,13 +258,14 @@
   function footHTML(c) {
     var e = c.exam;
     var doc = e.docId ? M.byId('docs', e.docId) : M.docFor('exam');
-    return '<div class="p-foot"><span>إعداد: ' + (c.T(e.preparedBy) || '………………') + ' · مراجعة: ' + (c.T(e.reviewedBy) || '………………') + ' · اعتماد: ' + (c.T(e.approvedBy) || '………………') + '</span>' +
+    var note = e.footerNote != null ? e.footerNote : (c.en ? 'Best wishes for success' : 'مع أطيب التمنيات بالنجاح والتوفيق');
+    return '<div class="p-foot"><span class="wish">' + c.T(note) + '</span>' +
       '<span>' + (doc ? '<span class="p-code">' + M.esc(doc.code) + '</span> · الإصدار ' + c.num(doc.version) + ' · ' : '') + 'صفحة <b data-pn></b> من <b data-pt></b></span></div>';
   }
 
   function miniHeadHTML(c) {
     var e = c.exam, subject = M.byId('subjects', e.subjectId);
-    return '<div class="pblock p-mini"><span>' + c.T(e.title || '') + ' — مادة ' + c.T(subject ? subject.name : '') + (e.model ? ' — نموذج (' + c.T(e.model) + ')' : '') + '</span><span>تابع الأسئلة</span></div>';
+    return '<div class="pblock p-mini"><span>' + c.T(e.title || '') + ' — مادة ' + c.T(M.examSubject(e)) + (e.model ? ' — نموذج (' + c.T(e.model) + ')' : '') + '</span><span>تابع الأسئلة</span></div>';
   }
 
   function pageShell(c) {
@@ -253,7 +306,7 @@
     newPage();
     addHTML(headerHTML(c, '<b data-pn></b>&nbsp;من&nbsp;<b data-pt></b>'));
     addHTML(infoHTML(c, '<b data-pt></b>'));
-    if (exam.showStudent !== false) addHTML(studentHTML());
+    addHTML(studentHTML(c));
     if (exam.showGradeTable !== false && exam.sections.length) addHTML(gradesHTML(c));
     if (exam.showInstructions !== false && exam.instructions) addHTML('<div class="pblock p-instr">' + c.T(exam.instructions) + '</div>');
 
@@ -301,7 +354,7 @@
       var contEl = p.querySelector('.p-cont');
       if (i < total - 1) contEl.textContent = c.en ? 'Please turn over →' : 'تابع الأسئلة في الصفحة التالية ←';
       else {
-        contEl.innerHTML = '<div class="p-end">' + (c.en ? 'End of questions — Good luck' : 'انتهت الأسئلة — مع تمنياتنا بالتوفيق') + '</div>' + signHTML;
+        contEl.innerHTML = '<div class="p-end">' + (c.en ? 'End of questions' : 'انتهت الأسئلة') + '</div>' + signHTML;
         var b = p.querySelector('.pg-body');
         if (overflow(b)) contEl.innerHTML = '<div class="p-end">' + (c.en ? 'End of questions' : 'انتهت الأسئلة') + '</div>';
       }
@@ -317,7 +370,8 @@
     var c = ctx(exam);
     var h = '<div class="pblock p-mini"><span>مفتاح ونموذج الإجابة — ' + c.T(exam.title || '') + (exam.model ? ' — نموذج (' + c.T(exam.model) + ')' : '') + '</span><span>الدرجة الكلية ' + c.num(M.examTotal(exam)) + '</span></div>';
     exam.sections.forEach(function (sec, idx) {
-      h += '<div class="pblock k-sec"><h4>السؤال ' + M.ordinal(idx) + ': ' + c.T(sec.title || M.TYPE[sec.type].title) + ' (' + c.T(M.gradeWord(M.sectionGrade(exam, sec))) + ')</h4>';
+      var inf = c.si.info[idx];
+      h += '<div class="pblock k-sec"><h4>السؤال ' + M.ordinal(inf.main) + (inf.hasParts ? ' (' + M.partLabel(exam, inf.part) + ')' : '') + ': ' + c.T(sec.title || M.TYPE[sec.type].title) + ' (' + c.T(M.gradeWord(M.sectionGrade(exam, sec))) + ')</h4>';
       if (sec.type === 'match') {
         var ml = M.matchLayout(exam, sec);
         ml.A.forEach(function (p, i) {
@@ -346,7 +400,7 @@
     var lessonIds = (exam.scopeLessonIds && exam.scopeLessonIds.length) ? exam.scopeLessonIds.slice() : [];
     exam.sections.forEach(function (s) { s.items.forEach(function (it) { var q = M.examQ(exam, it.qid); if (q && lessonIds.indexOf(q.lessonId) < 0) lessonIds.push(q.lessonId); }); });
     var rows = lessonIds.map(function (id) {
-      var l = M.byId('lessons', id) || { id: id, name: '—', periods: 1 };
+      var l = M.byId('lessons', id) || { id: id, name: id ? '—' : 'أسئلة مكتوبة يدوياً', periods: 1 };
       return { lesson: l, cnt: [0, 0, 0, 0], grd: [0, 0, 0, 0] };
     });
     var totalPeriods = rows.reduce(function (s, r) { return s + (Number(r.lesson.periods) || 1); }, 0) || 1;

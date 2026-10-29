@@ -14,7 +14,7 @@
     DATA_STORES.forEach(function (s) {
       data[s] = S[s].slice();
     });
-    if (kind === 'backup') { data.docs = S.docs; data.log = S.log; data.packs = S.packs; data.settings = {}; Object.keys(S.settings).forEach(function (k) { if (['folderHandle', 'aiKey', 'aiKeys', 'cloudSession'].indexOf(k) < 0) data.settings[k] = S.settings[k]; }); }
+    if (kind === 'backup') { data.docs = S.docs; data.log = S.log; data.packs = S.packs; data.settings = {}; Object.keys(S.settings).forEach(function (k) { if (['folderHandle', 'aiKey', 'aiKeys', 'cloudSession', 'bio'].indexOf(k) < 0) data.settings[k] = S.settings[k]; }); }
     var payload = JSON.stringify(data);
     return M.hash(payload).then(function (h) {
       return JSON.stringify({ format: 'miyar-pack', v: 1, kind: kind, createdAt: M.now(), from: { deviceId: S.settings.deviceId, name: M.me().name, role: M.role(), center: (S.settings.center || {}).name || '' }, hash: h, data: data });

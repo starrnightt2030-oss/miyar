@@ -156,9 +156,14 @@
         '<td style="min-width:160px">' + (target ? '<div class="bar"><i class="' + (pct < 60 ? 'w' : '') + '" style="width:' + pct + '%"></i></div><div class="small muted">' + n(ap) + ' من ' + n(target) + '</div>' : '<span class="small muted">بدون مستهدف</span>') + '</td></tr>';
     }).join('');
     var recent = S.log.slice(0, 8).map(function (e) { return '<tr><td class="small muted" style="white-space:nowrap">' + n(M.fmtDate(e.at, true)) + '</td><td>' + esc(e.action) + '</td><td>' + esc(e.target) + '</td><td class="small muted">' + esc(e.by) + '</td></tr>'; }).join('');
-    main.innerHTML = M.topbar('أهلاً، ' + esc(me.name || ''), esc(M.ROLES[M.role()]) + (S.settings.center.name ? ' · ' + esc(S.settings.center.name) : ''),
-      '<a class="btn" href="#/bank">' + I('plus') + ' سؤال جديد</a><a class="btn pri" href="#/gen">' + I('spark') + ' توليد نماذج استرشادية</a>') +
-      '<div class="content">' + (M.cloud && M.cloud.ready && !M.cloud.user ? '<div class="alert info">' + I('spark') + '<div style="flex:1">الخادم الأونلاين جاهز — سجّل الدخول لمزامنة عملك لحظياً مع باقي الأجهزة وتلقي الإشعارات الفورية.</div><a class="btn sm" href="#/cloud">تسجيل الدخول</a></div>' : '') + M.safetyBanner() + '<div id="h-folderbar"></div>' +
+    var hr = new Date().getHours(), greet = hr < 12 ? 'صباح الخير' : 'مساء الخير';
+    var exN = S.exams.length, lastEx = S.exams.slice().sort(function (a, b) { return a.updatedAt < b.updatedAt ? 1 : -1; })[0];
+    main.innerHTML = '<div class="content home">' +
+      '<section class="hero"><div class="hero-t"><span class="muted">' + greet + '،</span><h1>' + esc(me.name || '') + '</h1><span class="small muted">' + esc(M.ROLES[M.role()]) + (S.settings.center.name ? ' · ' + esc(S.settings.center.name) : '') + '</span></div>' +
+      '<div class="paths">' +
+      '<a class="path big bank" href="#/bank"><span class="p-ic">' + I('bank', 30) + '</span><div><b>بنك الأسئلة</b><span>أضف المواد والدروس، واكتب الأسئلة أو ولّدها من صور شرح الدرس، وراجعها واعتمدها</span></div><span class="p-meta">' + n(qs.length) + ' سؤال · ' + n(cnt('approved')) + ' معتمد</span><span class="p-go">' + I('back', 18) + '</span></a>' +
+      '<button type="button" class="path big exam" id="h-newexam"><span class="p-ic">' + I('exam', 30) + '</span><div><b>اختبار جديد</b><span>من بنك الأسئلة (تلقائياً أو باختيارك) أو يدوياً بكتابة الأسئلة مباشرة — بتنسيق احترافي ودرجات وأشكال</span></div><span class="p-meta">' + n(exN) + ' ورقة' + (lastEx ? ' · آخرها ' + esc(lastEx.title || '') : '') + '</span><span class="p-go">' + I('back', 18) + '</span></button>' +
+      '</div></section>' + (M.cloud && M.cloud.ready && !M.cloud.user ? '<div class="alert info">' + I('spark') + '<div style="flex:1">الخادم الأونلاين جاهز — سجّل الدخول لمزامنة عملك لحظياً مع باقي الأجهزة وتلقي الإشعارات الفورية.</div><a class="btn sm" href="#/cloud">تسجيل الدخول</a></div>' : '') + M.safetyBanner() + '<div id="h-folderbar"></div>' +
       (!M.db.persistent() ? '<div class="alert bad">' + I('warn') + '<div>المتصفح لا يسمح بالحفظ الدائم في هذا الوضع (مثل التصفح الخاص) — البيانات ستضيع عند الإغلاق.</div></div>' : '') +
       (days > 7 && S.questions.length ? '<div class="alert warn">' + I('warn') + '<div style="flex:1">' + (lastB ? 'آخر نسخة احتياطية منذ ' + n(Math.floor(days)) + ' يوماً.' : 'لم تُؤخذ نسخة احتياطية بعد.') + ' خذ نسخة الآن واحفظها خارج الجهاز.</div><button class="btn sm" id="h-backup">نسخة احتياطية</button></div>' : '') +
       '<div class="grid4">' +
@@ -173,6 +178,7 @@
       '<div class="aside" style="flex:1 1 380px"><div class="card flat"><div style="padding:14px 16px"><h2>آخر النشاط</h2></div>' +
       (recent ? '<div class="scroll-x"><table class="tbl"><tbody>' + recent + '</tbody></table></div>' : '<div style="padding:0 16px 16px" class="muted small">لا يوجد نشاط بعد.</div>') + '</div></div></div></div>';
     var hb = M.qs('#h-backup', main); if (hb) hb.onclick = function () { M.backup(); };
+    M.qs('#h-newexam', main).onclick = function () { M.newExamWizard(); };
     M.bindSafety(main);
     M.folderReconnectBar().then(function (h) { var fb = M.qs('#h-folderbar', main); if (fb && h) { fb.innerHTML = h; M.bindSafety(fb); } });
     M.qs('#h-addsub', main).onclick = function () { M.editSubject(null); };
@@ -230,6 +236,7 @@
       '<div class="field"><label for="st-ur">الدور</label><select id="st-ur" class="inp">' + Object.keys(M.ROLES).map(function (k) { return '<option value="' + k + '"' + (k === me.role ? ' selected' : '') + '>' + M.ROLES[k] + '</option>'; }).join('') + '</select></div>' +
       '<div class="field"><label for="st-up">رمز الدخول (اتركه فارغاً لإلغائه)</label><input id="st-up" class="inp" type="password" inputmode="numeric" value="' + esc(me.pin || '') + '" autocomplete="new-password"></div></div>' +
       '<div class="small muted" style="margin-top:8px">معرّف الجهاز: <span class="p-code">' + esc(st.deviceId) + '</span></div></div>' +
+      (M.securityCardHTML ? M.securityCardHTML() : '') +
       '<div class="card"><h2 style="margin-bottom:12px">الافتراضيات التربوية</h2><div class="grid2">' +
       '<div class="field"><span class="lbl">شكل الأرقام الافتراضي في الورقة</span><div class="seg" id="st-dg"><button type="button" data-v="arabic" class="' + (st.digits !== 'english' ? 'on' : '') + '">هندية ١٢٣</button><button type="button" data-v="english" class="' + (st.digits === 'english' ? 'on' : '') + '">إنجليزية 123</button></div></div>' +
       '<div class="field"><span class="lbl">النسب المستهدفة للمستويات المعرفية (٪) — المجموع ١٠٠</span><div class="grid4">' +
@@ -266,6 +273,7 @@
     M.qs('#snd-on', main).onchange = function (e) { M.setSetting('soundOn', e.target.checked); if (e.target.checked) M.sound('success', true); };
     M.qs('#snd-vol', main).onchange = function (e) { M.setSetting('soundVol', Number(e.target.value)).then(function () { M.sound('notify', true); }); };
     M.qsa('[data-sndt]', main).forEach(function (b) { b.onclick = function () { M.sound(b.dataset.sndt, true); }; });
+    if (M.bindSecurity) M.bindSecurity(main);
     var ins = M.qs('#st-install', main); if (ins) ins.onclick = function () { M.offerInstall(true); };
     M.qs('#st-chk', main).onclick = function () { M.checkUpdate(true); };
     M.qs('#st-ntf', main).onclick = function () { M.enableUpdateNotifications().then(function () { M.render(); }); };
@@ -288,7 +296,7 @@
   /* ===== التشغيل ===== */
   M.start = function () {
     M.load().then(function () {
-      if (M.me().pin) M._locked = true;
+      if (M.lockEnabled ? M.lockEnabled() : M.me().pin) M._locked = true;
       window.addEventListener('hashchange', M.render);
       M.render();
       M.ensurePersist();

@@ -97,7 +97,7 @@
       '\nوزّع المستويات المعرفية قريباً من: ' + targetsText() + '، بما يناسب طبيعة كل نوع.\n' +
       (opts.extra ? 'تعليمات إضافية من المدرس: ' + opts.extra + '\n' : '') +
       (opts.pagesText ? '' : !opts.images.length ? '\nلا توجد صور مرفقة: اعتمد على نص الدرس أعلاه فقط.\n' : '');
-    if (opts.pagesText) return { system: systemPrompt(true), text: 'نص صفحات شرح الدرس (منقول من الكتاب):\n' + opts.pagesText + '\n\n' + text, images: [], schema: Q_SCHEMA };
+    if (opts.pagesText) return { system: systemPrompt(true), text: 'نص صفحات شرح الدرس (منقول من الكتاب):\n' + opts.pagesText + '\n\n' + text, images: [], schema: Q_SCHEMA, maxOut: 10000, timeout: 180000 };
     return { system: systemPrompt(false), text: text, images: opts.images, schema: Q_SCHEMA };
   };
 
@@ -109,10 +109,12 @@
       build: function (spec, model) {
         var content = spec.images.map(function (d) { var x = splitData(d); return { type: 'image', source: { type: 'base64', media_type: x.mime, data: x.data } }; });
         content.push({ type: 'text', text: spec.text });
-        return { model: model, max_tokens: 16000, system: spec.system, messages: [{ role: 'user', content: content }], output_config: { format: { type: 'json_schema', schema: spec.schema } } };
+        var b = { model: model, max_tokens: spec.maxOut || 16000, system: spec.system, messages: [{ role: 'user', content: content }] };
+        if (spec.schema) b.output_config = { format: { type: 'json_schema', schema: spec.schema } };
+        return b;
       },
-      call: function (body, key) {
-        return post('https://api.anthropic.com/v1/messages', { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }, body);
+      call: function (body, key, tmo) {
+        return post('https://api.anthropic.com/v1/messages', { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }, body, tmo);
       },
       parse: function (j) {
         var txt = (j.content || []).filter(function (c) { return c.type === 'text'; }).map(function (c) { return c.text; }).join('');
@@ -128,10 +130,11 @@
       build: function (spec, model) {
         var content = spec.images.map(function (d) { return { type: 'image_url', image_url: { url: d, detail: 'high' } }; });
         content.push({ type: 'text', text: spec.text });
-        return { model: model, max_completion_tokens: 16000, messages: [{ role: 'system', content: spec.system }, { role: 'user', content: content }],
-          response_format: { type: 'json_schema', json_schema: { name: 'exam_questions', schema: spec.schema, strict: true } } };
+        var b = { model: model, max_completion_tokens: spec.maxOut || 16000, messages: [{ role: 'system', content: spec.system }, { role: 'user', content: content }] };
+        if (spec.schema) b.response_format = { type: 'json_schema', json_schema: { name: 'exam_questions', schema: spec.schema, strict: true } };
+        return b;
       },
-      call: function (body, key) { return post('https://api.openai.com/v1/chat/completions', { Authorization: 'Bearer ' + key }, body); },
+      call: function (body, key, tmo) { return post('https://api.openai.com/v1/chat/completions', { Authorization: 'Bearer ' + key }, body, tmo); },
       parse: function (j) {
         var c = j.choices && j.choices[0] && j.choices[0].message;
         if (c && c.refusal) throw new Error('رفض النموذج: ' + c.refusal);
@@ -149,17 +152,17 @@
       build: function (spec, model, legacy) {
         var parts = spec.images.map(function (d) { var x = splitData(d); return { inlineData: { mimeType: x.mime, data: x.data } }; });
         parts.push({ text: spec.text });
-        var gc = { responseMimeType: 'application/json', maxOutputTokens: 16000 };
-        if (legacy === 2) { /* بدون مخطط: نعتمد على وصف الطلب */ }
+        var gc = { responseMimeType: spec.schema ? 'application/json' : 'text/plain', maxOutputTokens: spec.maxOut || 16000 };
+        if (legacy === 2 || !spec.schema) { /* بدون مخطط */ }
         else if (legacy === 1) gc.responseSchema = stripAP(spec.schema);
         else gc.responseJsonSchema = spec.schema;
         /* Gemini 3: التفكير المنخفض أسرع بكثير ويكفي لصياغة الأسئلة */
         if (/gemini-3/.test(model) && !legacy) gc.thinkingConfig = { thinkingLevel: 'low' };
         return { __model: model, systemInstruction: { parts: [{ text: spec.system }] }, contents: [{ role: 'user', parts: parts }], generationConfig: gc };
       },
-      call: function (body, key) {
+      call: function (body, key, tmo) {
         var model = body.__model; var b = Object.assign({}, body); delete b.__model;
-        return post('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent', { 'x-goog-api-key': key }, b);
+        return post('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent', { 'x-goog-api-key': key }, b, tmo);
       },
       parse: function (j) {
         var cand = j.candidates && j.candidates[0];
@@ -180,8 +183,8 @@
   function pickBy(list, pats) { for (var i = 0; i < pats.length; i++) { var m = list.find(function (x) { return pats[i].test(x.id); }); if (m) return m.id; } return list[0] ? list[0].id : ''; }
 
   var TIMEOUT = 240000; /* ٤ دقائق كحد أقصى لكل طلب */
-  function post(url, headers, body) {
-    var ac = window.AbortController ? new AbortController() : null, tm = ac ? setTimeout(function () { ac.abort(); }, TIMEOUT) : 0;
+  function post(url, headers, body, tmo) {
+    var ac = window.AbortController ? new AbortController() : null, tm = ac ? setTimeout(function () { ac.abort(); }, tmo || TIMEOUT) : 0;
     return fetch(url, { method: 'POST', headers: Object.assign({ 'content-type': 'application/json' }, headers), body: JSON.stringify(body), signal: ac ? ac.signal : undefined })
       .catch(function (e) { clearTimeout(tm); if (e && e.name === 'AbortError') { var t = new Error('TIMEOUT'); t.timeout = true; throw t; } throw e; })
       .then(function (r) { clearTimeout(tm); return r; })
@@ -199,7 +202,7 @@
     if (/429|rate|quota|exceeded|RESOURCE_EXHAUSTED/i.test(m)) return 'تجاوزت الحد المسموح في الدقيقة أو اليوم — انتظر دقيقة وأعد المحاولة، أو قلّل عدد الأنواع في المرة الواحدة';
     if (/credit|billing|balance/i.test(m)) return 'رصيد الحساب غير كافٍ — أضف رصيداً من موقع المزود';
     if (/model.*(not found|does not exist)|not supported/i.test(m)) return 'النموذج المختار غير متاح لهذا المفتاح — اختر نموذجاً آخر من القائمة';
-    if (/^TIMEOUT$/.test(m)) return 'النموذج تأخر أكثر من ٤ دقائق في الرد — قلّل عدد الصفحات أو عدد الأسئلة، أو جرّب مرة أخرى';
+    if (/^TIMEOUT$/.test(m)) return 'النموذج تأخر في الرد (غالباً زحمة على الخدمة المجانية) — جرّب مرة أخرى بعد قليل، أو قلّل عدد الأسئلة';
     if (/Failed to fetch|NetworkError|Load failed|network/i.test(m)) return 'انقطع الاتصال أثناء الإرسال — تأكد من الإنترنت وأبقِ الشاشة مفتوحة أثناء التوليد';
     return m;
   }
@@ -241,7 +244,7 @@
 
   function rawCall(route, model, spec, legacy) {
     var ad = ADAPT[route.provider], body = ad.build(spec, model, legacy);
-    var p = route.via === 'cloud' ? M.cloud.invoke('generate', { provider: route.provider, model: model, body: body }) : ad.call(body, keys()[route.provider]);
+    var p = route.via === 'cloud' ? M.cloud.invoke('generate', { provider: route.provider, model: model, body: body }) : ad.call(body, keys()[route.provider], spec.timeout);
     return p.then(function (j) { return ad.parse(j); });
   }
   function callOnce(route, model, spec, legacy) {
@@ -265,21 +268,44 @@
   M.lessonPagesText = function (lesson) { return lesson.pagesText && lesson.pagesSig === imgSig(lesson.images) ? lesson.pagesText : ''; };
   var X_SCHEMA = { type: 'object', additionalProperties: false, required: ['pages'], properties: { pages: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['page', 'text'], properties: { page: { type: 'integer' }, text: { type: 'string' } } } } } };
   M.aiExtract = function (route, model, lesson) {
-    var spec = {
-      system: 'أنت ناسخ دقيق لصفحات الكتب المدرسية العربية (تعليم فني صناعي). انقل محتوى كل صفحة نصاً كما هو بدون تلخيص ولا إضافة ولا تصحيح للمعنى.',
-      text: 'انقل محتوى صفحات الدرس المرفقة (' + lesson.images.length + ' صفحة بالترتيب) إلى نص:\n' +
-        '- كل صفحة في عنصر مستقل: page رقمها من 1، وtext محتواها كاملاً بترتيب القراءة.\n- حافظ على العناوين والتعريفات والقوانين والوحدات والقيم كما هي. اكتب المعادلات بصيغة $...$ والأرقام بالأرقام الإنجليزية.\n' +
-        '- الجداول: صفاً صفاً بفاصل |.\n- كل شكل أو رسم أو دائرة: اكتب [شكل: وصف دقيق لما فيه وأسماء أجزائه وبياناته].\n- تجاهل أرقام الصفحات والهوامش الزخرفية. إذا كان جزء غير مقروء اكتب [غير واضح].',
-      images: lesson.images, schema: X_SCHEMA
+    /* كل صفحة في طلب مستقل وبنص عادي (بدون JSON): ردود قصيرة وسريعة، وأكثر من صفحة في نفس الوقت */
+    var imgs = lesson.images.slice(), texts = new Array(imgs.length), errs = [], done = 0, t0 = Date.now(), usage = { input_tokens: 0, output_tokens: 0 };
+    var st = function (t) { if (M._aiStatus) M._aiStatus(t); };
+    var one = function (i) {
+      var spec = {
+        system: 'أنت ناسخ دقيق لصفحات الكتب المدرسية العربية (تعليم فني صناعي). تنقل محتوى الصفحة نصاً كما هو بدون تلخيص ولا إضافة ولا شرح.',
+        text: 'انقل محتوى صفحة الكتاب المرفقة إلى نص عادي (ليس JSON وليس Markdown):\n' +
+          '- بترتيب القراءة، مع العناوين والتعريفات والقوانين والوحدات والقيم كما هي.\n- المعادلات بصيغة $...$ والأرقام بالأرقام الإنجليزية.\n' +
+          '- الجداول صفاً صفاً بفاصل |.\n- كل شكل أو رسم أو دائرة: [شكل: وصف دقيق لما فيه وأسماء أجزائه وبياناته].\n' +
+          '- تجاهل رقم الصفحة والزخارف. الجزء غير المقروء: [غير واضح].\n- اكتب المحتوى فقط بدون أي مقدمة أو تعليق.',
+        images: [imgs[i]], schema: null, maxOut: 6000, timeout: 150000
+      };
+      var attempt = function (left) {
+        return withRetry(function () { return rawCall(route, model, spec, 0); }, 2).catch(function (e) {
+          if (e.timeout && left > 0) { st('صفحة ' + n(i + 1) + ' تأخرت — محاولة أخرى…'); return attempt(left - 1); }
+          throw e;
+        });
+      };
+      return attempt(1).then(function (r) {
+        var t = String(r.text || '').replace(/^```[a-z]*\n?/i, '').replace(/```\s*$/, '').trim();
+        if (!t) throw new Error('رد فارغ');
+        texts[i] = t; usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0;
+      }).catch(function (e) { errs.push('صفحة ' + n(i + 1) + ': ' + friendly(e.message)); })
+        .then(function () { done++; st('المرحلة ١ من ٢: قراءة الصفحات — ' + n(done) + ' من ' + n(imgs.length) + (errs.length ? ' (تعذّر ' + n(errs.length) + ')' : '') + '…'); });
     };
-    var t0 = Date.now();
-    return withRetry(function () { return schemaFallback(route, function (lg) { return rawCall(route, model, spec, lg); }); }, 3).then(function (r) {
-      var d = parseObj(r.text), pages = (d.pages || []).filter(function (p) { return p && String(p.text || '').trim(); });
-      if (!pages.length) throw new Error('لم يتمكن النموذج من قراءة الصفحات — تأكد من وضوح الصور');
-      var txt = pages.map(function (p, i) { return '[صفحة ' + (p.page || i + 1) + ']\n' + String(p.text).trim(); }).join('\n\n');
-      lesson.pagesText = txt; lesson.pagesSig = imgSig(lesson.images); lesson.pagesAt = M.nowISO ? M.nowISO() : new Date().toISOString();
-      M.log && M.log('قراءة صفحات الدرس', lesson.name, n(pages.length) + ' صفحة في ' + n(Math.round((Date.now() - t0) / 1000)) + ' ث');
-      return M.save('lessons', lesson, { log: false }).then(function () { return { text: txt, usage: r.usage }; });
+    var queue = imgs.map(function (_, i) { return i; }), par = route.provider === 'gemini' ? 3 : 4;
+    var worker = function () { var i = queue.shift(); if (i == null) return Promise.resolve(); return one(i).then(worker); };
+    st('المرحلة ١ من ٢: قراءة الصفحات — ٠ من ' + n(imgs.length) + '…');
+    var ws = []; for (var k = 0; k < Math.min(par, imgs.length); k++) ws.push(worker());
+    return Promise.all(ws).then(function () {
+      var got = texts.filter(Boolean).length;
+      if (!got) throw new Error(errs[0] ? errs[0].replace(/^صفحة [^:]+: /, '') : 'لم يتمكن النموذج من قراءة الصفحات — تأكد من وضوح الصور');
+      var txt = texts.map(function (t, i) { return t ? '[صفحة ' + (i + 1) + ']\n' + t : ''; }).filter(Boolean).join('\n\n');
+      lesson.pagesText = txt;
+      /* لو صفحة لم تُقرأ لا نثبّت البصمة، فتُعاد القراءة في المرة القادمة */
+      lesson.pagesSig = errs.length ? '' : imgSig(lesson.images); lesson.pagesAt = new Date().toISOString();
+      M.log && M.log('قراءة صفحات الدرس', lesson.name, n(got) + ' من ' + n(imgs.length) + ' صفحة في ' + n(Math.round((Date.now() - t0) / 1000)) + ' ث');
+      return M.save('lessons', lesson, { log: false }).then(function () { return { text: txt, usage: usage, errors: errs }; });
     });
   };
   function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
@@ -311,7 +337,7 @@
       else {
         st('المرحلة ١ من ٢: قراءة ' + n(opts.images.length) + ' صفحة وتحويلها لنص (مرة واحدة فقط للدرس)…');
         return M.aiExtract(opts.route, opts.model, opts.lesson).then(function (x) {
-          opts.pagesText = x.text; opts._xUsage = x.usage; return M.aiGenerate(opts, onProgress);
+          opts.pagesText = x.text; opts._xUsage = x.usage; opts._xErrors = x.errors || []; return M.aiGenerate(opts, onProgress);
         });
       }
     }
@@ -320,7 +346,7 @@
     var cap = opts.pagesText ? 2 : 3;
     var per = Math.max(1, Math.min(cap, Math.floor((opts.pagesText ? 12 : 18) / Math.max(1, opts.count)))), batches = [];
     for (var b = 0; b < opts.types.length; b += per) batches.push(opts.types.slice(b, b + per));
-    var results = [], notes = [], errors = [], failedTypes = [], done = 0, xu = opts._xUsage || {}, usage = { input_tokens: xu.input_tokens || 0, output_tokens: xu.output_tokens || 0 };
+    var results = [], notes = [], errors = (opts._xErrors || []).map(function (e) { return 'لم تُقرأ ' + e; }), failedTypes = [], done = 0, xu = opts._xUsage || {}, usage = { input_tokens: xu.input_tokens || 0, output_tokens: xu.output_tokens || 0 };
     function next() {
       var ts = batches.shift(); if (!ts) return Promise.resolve();
       var label = ts.map(function (t) { return M.TYPE[t].label; }).join('، ');

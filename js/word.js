@@ -20,12 +20,14 @@
     });
   }
 
-  function mk(mode) {
+  function mk(mode, exam) {
     var d = D();
     var T = function (s) { return M.digits(String(s == null ? '' : s), mode); };
+    var ALLB = !!(exam && exam.boldText), SC = exam && !exam.compact && !exam.largePrint ? (Number(exam.fontSize) || 14) / 14 : 1;
+    var SZ = function (s) { return Math.round((s || 12) * SC * 2); };
     var run = function (text, o) {
       o = o || {};
-      return new d.TextRun({ text: T(text), rightToLeft: true, bold: !!o.bold, size: (o.size || 12) * 2, font: FONT, color: o.color });
+      return new d.TextRun({ text: T(text), rightToLeft: true, bold: ALLB || !!o.bold, size: SZ(o.size), font: FONT, color: o.color });
     };
     var richRuns = function (text, o) {
       o = o || {};
@@ -33,7 +35,7 @@
       String(text == null ? '' : text).split(/(\$[^$]+\$)/g).forEach(function (part) {
         if (!part) return;
         if (/^\$[^$]+\$$/.test(part)) {
-          M.mathRuns(part.slice(1, -1)).forEach(function (r) { out.push(new d.TextRun({ text: T(r.text), rightToLeft: true, bold: !!o.bold, size: (o.size || 12) * 2, font: FONT, color: o.color, superScript: !!r.sup, subScript: !!r.sub })); });
+          M.mathRuns(part.slice(1, -1)).forEach(function (r) { out.push(new d.TextRun({ text: T(r.text), rightToLeft: true, bold: ALLB || !!o.bold, size: SZ(o.size), font: FONT, color: o.color, superScript: !!r.sup, subScript: !!r.sub })); });
         } else out.push(run(part.replace(/\[\[(.+?)\]\]/g, '……………………'), o));
       });
       return out.length ? out : [run('', o)];
@@ -214,7 +216,7 @@
   function pageProps() { return { page: { size: { width: 11906, height: 16838 }, margin: { top: 720, bottom: 720, left: 720, right: 720 } } }; }
 
   M.exportExamWord = function (exam) {
-    var k = mk(exam.digits);
+    var k = mk(exam.digits, exam);
     var cen = M.S.settings.center || {};
     var jobs = [];
     var logo = null, imgs = {};
@@ -234,7 +236,7 @@
   };
 
   M.exportKeyWord = function (exam) {
-    var k = mk(exam.digits), L = exam.lang === 'en' ? M.EN_LETTERS : M.AR_LETTERS;
+    var k = mk(exam.digits, exam), L = exam.lang === 'en' ? M.EN_LETTERS : M.AR_LETTERS;
     var kids = headerBlocks(k, Object.assign({}, exam, { showStudent: false, showGradeTable: false, showInstructions: false }), null);
     kids.push(k.para('مفتاح ونموذج الإجابة', { bold: true, size: 15, center: true, before: 120 }));
     var KS = M.secInfo(exam);

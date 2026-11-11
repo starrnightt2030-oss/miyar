@@ -11,7 +11,9 @@
   ];
   M.ACCENTS = [['#1F2A44', 'كحلي'], ['#1D4ED8', 'أزرق'], ['#B91C1C', 'أحمر'], ['#0F766E', 'أخضر'], ['#6D28D9', 'بنفسجي'], ['#111827', 'أسود']];
   var SEPS = [['none', 'بدون'], ['space', 'مسافة'], ['dotted', 'خط منقّط'], ['line', 'خط متصل'], ['box', 'مربع لكل فرع']];
-  var POS = [['above', 'فوق'], ['below', 'تحت'], ['side-start', 'يمين'], ['side', 'يسار'], ['after', 'بعد الحل']];
+  var POS = [['above', 'فوق'], ['below', 'تحت'], ['side-start', 'يمين'], ['side', 'يسار'], ['after', 'بعد الحل'], ['inside', 'داخل الإجابة']];
+  var NO_INSIDE = ['tf', 'match', 'image'];
+  var posFor = function (t) { return POS.filter(function (p) { return p[0] !== 'inside' || NO_INSIDE.indexOf(t) < 0; }); };
   var TYPE_HELP = { mcq: 'اختيارات وإجابة صحيحة', tf: 'صح أو خطأ مع التصويب', complete: 'فراغات وبنك كلمات', match: 'عمودان (أ) و(ب)', term: 'اكتب المصطلح العلمي', reason: 'علّل مع سطور للإجابة', essay: 'سؤال مقالي بسطور', draw: 'مساحة رسم بشبكة', image: 'صورة بأجزاء مرقّمة', problem: 'مسألة بسطور للحل' };
   var SYMS = ['Ω', 'µ', 'Δ', 'θ', 'π', '°', '±', '×', '÷', '√', '≤', '≥', '≠', '≈', '∞', '→', '⇌', '²', '³', '½', '¼', '∠', '⊥', '∥', 'α', 'β', 'λ', '∑'];
   var SOL_TYPES = ['mcq', 'complete', 'term', 'tf'];
@@ -69,7 +71,7 @@
     function restore(snap) {
       e = JSON.parse(snap); lastSnap = snap; burst = false; clearTimeout(histTimer);
       if (sel && (!sec(sel.s) || (sel.i >= 0 && !itemAt(sel.s, sel.i)))) sel = null;
-      saveState('جارٍ الحفظ…'); persist(); drawPane(); renderPaper(); updUndo(); drawHead();
+      saveState('جارٍ الحفظ…'); persist(); drawPane(); renderPaper(); updUndo(); drawHead(); fntUI();
     }
     function undo() { if (burst) { burst = false; clearTimeout(histTimer); } if (!hist.length) return; fut.push(JSON.stringify(e)); restore(hist.pop()); M.toast('تراجع'); }
     function redo() { if (!fut.length) return; hist.push(JSON.stringify(e)); restore(fut.pop()); }
@@ -89,6 +91,7 @@
       '<div class="sd-split" id="sd-split" role="separator" aria-label="اسحب لتغيير المساحة"><span></span></div>' +
       '<section class="sd-paper" aria-label="معاينة الورقة"><div class="sd-ptools"><div class="seg" id="sd-view"><button type="button" data-v="paper" class="on">الورقة</button><button type="button" data-v="key">المفتاح</button></div>' +
       '<span class="sd-pc" id="sd-pc"></span><span style="flex:1"></span>' +
+      '<div class="sd-fnt" role="group" aria-label="خط الامتحان كله"><button type="button" class="btn icon sm ghost" id="sd-fsm" aria-label="تصغير خط الامتحان كله" title="تصغير الخط للامتحان كله">A−</button><span id="sd-fsv" title="حجم خط الامتحان"></span><button type="button" class="btn icon sm ghost" id="sd-fsp" aria-label="تكبير خط الامتحان كله" title="تكبير الخط للامتحان كله">A+</button><button type="button" class="btn icon sm ghost" id="sd-bold" aria-label="خط عريض للامتحان كله" title="خط عريض (Bold) للامتحان كله"><b>B</b></button></div>' +
       '<button class="btn icon sm ghost" id="sd-zo" aria-label="تصغير">' + I('zout', 18) + '</button><button class="btn sm ghost" id="sd-zf" aria-label="ملء العرض">' + I('fit', 16) + '</button><button class="btn icon sm ghost" id="sd-zi" aria-label="تكبير">' + I('zin', 18) + '</button></div>' +
       '<div class="sd-pages" id="sd-pages"></div></section></div></div>';
     var body = M.qs('#sd-body', app), pagesBox = M.qs('#sd-pages', app);
@@ -207,12 +210,13 @@
       else if (SOL_TYPES.indexOf(t) >= 0) h += stepper('st-sol', Number(q.solLines) || 0, 'سطور للحل');
       h += '</div>';
       if (t === 'draw') h += '<label class="check"><input type="checkbox" data-qb="drawGrid"' + (q.drawGrid !== false ? ' checked' : '') + '> شبكة مربعات في مساحة الرسم</label>';
+      else if (LINE_TYPES.indexOf(t) >= 0 || (SOL_TYPES.indexOf(t) >= 0 && t !== 'tf')) h += '<label class="check"><input type="checkbox" data-qb="ansGrid"' + (q.ansGrid ? ' checked' : '') + '> مربعات بدل السطور في مساحة ' + (LINE_TYPES.indexOf(t) >= 0 ? 'الإجابة' : 'الحل') + '</label>';
       /* الصورة المرفقة */
       if (q.figure) {
         h += '<div class="figbox"><img src="' + q.figure + '" alt="صورة السؤال"><div class="fb-b">' +
-          '<div class="pos-grid" id="ie-pos">' + POS.map(function (p) { return '<button type="button" data-pos="' + p[0] + '" class="pt pt-' + p[0] + ((q.figurePos || 'below') === p[0] ? ' on' : '') + '"><span class="pg" aria-hidden="true"><i></i><i></i><i></i><b></b></span>' + p[1] + '</button>'; }).join('') + '</div>' +
+          '<div class="pos-grid" id="ie-pos">' + posFor(t).map(function (p) { return '<button type="button" data-pos="' + p[0] + '" class="pt pt-' + p[0] + ((q.figurePos || 'below') === p[0] ? ' on' : '') + '"><span class="pg" aria-hidden="true"><i></i><i></i><i></i><b></b></span>' + p[1] + '</button>'; }).join('') + '</div>' +
           '<label class="lbl" for="ie-fw">الحجم: <b id="ie-fwv">' + n(Number(q.figureWidth) || 60) + '٪</b></label><input id="ie-fw" type="range" min="15" max="' + (/side/.test(q.figurePos || '') ? 55 : 100) + '" step="5" value="' + (Number(q.figureWidth) || 60) + '">' +
-          '<div class="row" style="gap:6px">' + segHTML('ie-fa', [['start', 'يمين'], ['center', 'وسط'], ['end', 'يسار']], q.figureAlign || 'center') + '</div>' +
+          '<div class="row" style="gap:6px">' + segHTML('ie-fa', [['start', 'يمين'], ['center', 'وسط'], ['end', 'يسار']], q.figureAlign || 'center') + (q.figurePos === 'inside' ? segHTML('ie-fv', [['top', 'أعلى'], ['middle', 'منتصف'], ['bottom', 'أسفل']], q.figureVAlign || 'top') : '') + '</div>' +
           '<input class="inp paper-font" data-qk="figureCaption" value="' + esc(q.figureCaption || '') + '" placeholder="تعليق تحت الصورة — مثال: شكل (١)">' +
           '<div class="row" style="gap:6px"><button type="button" class="btn sm" data-figtools>' + I('fit', 15) + ' قص وتبييض</button>' + (q.figureShapes ? '<button type="button" class="btn sm" data-figdraw>تعديل الرسم</button>' : '') + '<button type="button" class="btn sm" data-fig>تغيير</button><button type="button" class="btn sm danger" data-figrm>إزالة</button></div>' +
           '<span class="small muted">أو اسحب الصورة على الورقة لتغيير مكانها، واسحب ركنها للتكبير.</span></div></div>';
@@ -234,7 +238,7 @@
         '<div class="ie-row">' + stepper('st-fs', Number(e.fontSize) || 14, 'حجم الخط') + field('الأرقام', segHTML('tp-dg', [['arabic', '١٢٣'], ['english', '123']], e.digits || 'arabic')) + '</div>' +
         field('مقاس الورق', segHTML('tp-paper', [['a4', 'A4'], ['a3-booklet', 'A3 كتيّب'], ['a3-spread', 'A3 صفحتان']], e.paper || 'a4')) +
         field('لغة الورقة', segHTML('tp-lang', [['ar', 'عربي'], ['en', 'English']], e.lang || 'ar')) +
-        '<div class="sw-list">' + tg('showStudent', 'سطر اسم الطالب', true) + tg('showGradeTable', 'جدول الدرجات', true) + tg('showDoc', 'مربع وثيقة الجودة في الترويسة', true) + tg('showInstructions', 'سطر التعليمات', true) + tg('showSign', 'توقيعات المصحح والمراجع', true) + tg('compact', 'مسافات مضغوطة (صفحات أقل)', false) + tg('largePrint', 'طباعة مكبّرة (لضعاف البصر)', false) + tg('shuffleOptions', 'خلط ترتيب الاختيارات', false) + '</div>' +
+        '<div class="sw-list">' + tg('boldText', 'خط عريض (Bold) للامتحان كله', false) + tg('showStudent', 'سطر اسم الطالب', true) + tg('showGradeTable', 'جدول الدرجات', true) + tg('showDoc', 'مربع وثيقة الجودة في الترويسة', true) + tg('showInstructions', 'سطر التعليمات', true) + tg('showSign', 'توقيعات المصحح والمراجع', true) + tg('compact', 'مسافات مضغوطة (صفحات أقل)', false) + tg('largePrint', 'طباعة مكبّرة (لضعاف البصر)', false) + tg('shuffleOptions', 'خلط ترتيب الاختيارات', false) + '</div>' +
         '<button type="button" class="btn" id="tp-def">' + I('check', 16) + ' اجعل هذا التنسيق افتراضياً للامتحانات الجديدة</button></div>';
     }
     var thumbCache = {};
@@ -339,9 +343,9 @@
       on('[data-ln]', 'oninput', function (el) { curQ().labels[+el.dataset.ln].n = el.value; touch(); });
       on('[data-lname]', 'oninput', function (el) { curQ().labels[+el.dataset.lname].name = el.value; touch(); });
       on('[data-extras]', 'oninput', function (el) { curQ().extras = el.value.split(/[؛;]/).map(function (x) { return x.trim(); }).filter(Boolean); touch(); });
-      on('[data-qb]', 'onchange', function (el) { curQ()[el.dataset.qb] = el.checked; touch(); });
+      on('[data-qb]', 'onchange', function (el) { curQ()[el.dataset.qb] = el.checked; touch(); if (el.checked && el.dataset.qb === 'ansGrid') { var qg = curQ(); if (LINE_TYPES.indexOf(qg.type) >= 0 ? !Number(qg.lines) : !Number(qg.solLines)) { if (LINE_TYPES.indexOf(qg.type) >= 0) qg.lines = 6; else qg.solLines = 6; touch(true); } } });
       on('[data-sb]', 'onchange', function (el) { var s = sec(sel.s), k = el.dataset.sb; if (k === 'layout2') s.layout = el.checked ? 'two' : 'auto'; else s[k] = el.checked; touch(k === 'part'); });
-      on('[data-eb]', 'onchange', function (el) { e[el.dataset.eb] = el.checked; touch(el.dataset.eb === 'showSeat'); });
+      on('[data-eb]', 'onchange', function (el) { e[el.dataset.eb] = el.checked; fntUI(); touch(el.dataset.eb === 'showSeat'); });
       on('[data-correct]', 'onclick', function (b) { curQ().correct = +b.dataset.correct; touch(true); });
       on('[data-delopt]', 'onclick', function (b) { var q = curQ(), i = +b.dataset.delopt; q.options.splice(i, 1); if (q.correct >= q.options.length || q.correct === i) q.correct = 0; else if (q.correct > i) q.correct--; touch(true); });
       on('[data-addopt]', 'onclick', function () { curQ().options.push(''); touch(true); var ins = M.qsa('[data-opt]', p); if (ins.length) ins[ins.length - 1].focus(); });
@@ -367,7 +371,7 @@
       stp(p, '#st-lines', function (v) { curQ().lines = Math.max(0, Math.min(30, Math.round(v))); touch(); }, 1);
       stp(p, '#st-sol', function (v) { curQ().solLines = Math.max(0, Math.min(30, Math.round(v))); touch(); }, 1);
       stp(p, '#st-dh', function (v) { curQ().drawHeight = Math.max(40, Math.min(900, Math.round(v))); touch(); }, 20);
-      stp(p, '#st-fs', function (v) { e.fontSize = Math.max(11, Math.min(20, v)); touch(); }, 0.5);
+      stp(p, '#st-fs', function (v) { e.fontSize = Math.max(11, Math.min(24, v)); fntUI(); touch(); }, 0.5);
       var ug = M.qs('#sk-ugo', p); if (ug) ug.onclick = function () { var v = Number(M.toWestern(M.qs('#sk-ug', p).value)); if (!(v >= 0)) return M.toast('اكتب الدرجة', 'bad'); sec(sel.s).items.forEach(function (it) { var q = qOf(it); if (q) q.grade = v; }); touch(true); M.toast('طُبّقت الدرجة على كل الفروع', 'ok'); };
       /* أفعال القسم والفرع */
       on('[data-sact]', 'onclick', function (b) { secAct(b.dataset.sact); });
@@ -384,6 +388,7 @@
       on('[data-figdraw]', 'onclick', function () { var q = curQ(); M.drawEditor({ shapes: q.figureShapes, grid: q.figureGrid }, function (rr) { q.figure = rr.image; q.figureShapes = rr.shapes; q.figureGrid = rr.grid; touch(true); }); });
       on('[data-pos]', 'onclick', function (b) { setPos(b.dataset.pos); });
       on('#ie-fa button', 'onclick', function (b) { curQ().figureAlign = b.dataset.v; touch(true); });
+      on('#ie-fv button', 'onclick', function (b) { curQ().figureVAlign = b.dataset.v; touch(true); });
       var fw = M.qs('#ie-fw', p); if (fw) fw.oninput = function () { curQ().figureWidth = Number(fw.value); M.qs('#ie-fwv', p).textContent = n(fw.value) + '٪'; touch(); };
       on('[data-img]', 'onclick', function () { pickImage(function (d) { curQ().image = d; curQ().imageShapes = null; touch(true); }); });
       on('[data-drawimg]', 'onclick', function () { var q = curQ(); M.drawEditor({ shapes: q.imageShapes }, function (rr) { q.image = rr.image; q.imageShapes = rr.shapes; touch(true); }); });
@@ -457,6 +462,12 @@
     function setPos(pos) {
       var q = curQ(); if (!q) return;
       q.figurePos = pos; if (/side/.test(pos) && (Number(q.figureWidth) || 60) > 55) q.figureWidth = 40;
+      if (pos === 'inside') {
+        if (LINE_TYPES.indexOf(q.type) >= 0 && !Number(q.lines)) q.lines = 6;
+        else if (SOL_TYPES.indexOf(q.type) >= 0 && !Number(q.solLines)) q.solLines = 6;
+        if ((Number(q.figureWidth) || 60) > 60) q.figureWidth = 45;
+        M.toast('الصورة داخل مساحة الإجابة — فعّل «مربعات بدل السطور» لو عايز شبكة', '');
+      }
       touch(true);
     }
     function pickImage(cb, capture) {
@@ -558,7 +569,7 @@
       var put = function (r) { ov.style.left = (r.left - br.left + pagesBox.scrollLeft) + 'px'; ov.style.top = (r.top - br.top + pagesBox.scrollTop) + 'px'; ov.style.width = r.width + 'px'; ov.style.height = r.height + 'px'; };
       put(fr);
       ov.innerHTML = '<span class="h hl" data-h="l" aria-hidden="true"></span><span class="h hr" data-h="r" aria-hidden="true"></span><span class="h hbl" data-h="l" aria-hidden="true"></span><span class="h hbr" data-h="r" aria-hidden="true"></span>' +
-        '<div class="fig-bar">' + POS.map(function (p) { return '<button type="button" data-p="' + p[0] + '" class="' + ((q.figurePos || 'below') === p[0] ? 'on' : '') + '">' + p[1] + '</button>'; }).join('') + '<button type="button" data-tools aria-label="قص وتبييض">' + I('fit', 14) + '</button></div>' +
+        '<div class="fig-bar">' + posFor(q.type).map(function (p) { return '<button type="button" data-p="' + p[0] + '" class="' + ((q.figurePos || 'below') === p[0] ? 'on' : '') + '">' + p[1] + '</button>'; }).join('') + '<button type="button" data-tools aria-label="قص وتبييض">' + I('fit', 14) + '</button></div>' +
         '<span class="fig-w">' + n(Number(q.figureWidth) || 60) + '٪</span>';
       pagesBox.appendChild(ov);
       M.qsa('[data-p]', ov).forEach(function (b) { b.onclick = function (ev) { ev.stopPropagation(); setPos(b.dataset.p); }; });
@@ -599,8 +610,10 @@
         if (d.moved && d.zone) setPos(d.zone);
       });
     }
+    function ansEl(host) { var q = curQ(); if (!q || NO_INSIDE.indexOf(q.type) >= 0) return null; return M.qs('.p-inarea,.p-draw,.p-lines', host); }
     function zoneAt(host, x, y) {
-      var r = host.getBoundingClientRect(), pad = 36;
+      var r = host.getBoundingClientRect(), pad = 36, ae = ansEl(host);
+      if (ae) { var ar = ae.getBoundingClientRect(); if (x >= ar.left && x <= ar.right && y >= ar.top && y <= ar.bottom) return 'inside'; }
       if (x < r.left - 60 || x > r.right + 60 || y < r.top - pad - 30 || y > r.bottom + pad + 30) return null;
       var h = r.height + pad * 2, top = r.top - pad;
       if (y < top + h * 0.28) return 'above';
@@ -612,6 +625,8 @@
       var z = document.createElement('div'); z.className = 'fig-zones';
       z.style.left = (r.left - br.left + pagesBox.scrollLeft) + 'px'; z.style.top = (r.top - pad - br.top + pagesBox.scrollTop) + 'px'; z.style.width = r.width + 'px'; z.style.height = (r.height + pad * 2) + 'px';
       z.innerHTML = '<span data-z="above">فوق السؤال</span><span data-z="side-start">بجانبه يمين</span><span data-z="side">بجانبه يسار</span><span data-z="below">تحت السؤال</span>';
+      var ae = ansEl(host);
+      if (ae) { var ar = ae.getBoundingClientRect(), s = document.createElement('span'); s.dataset.z = 'inside'; s.className = 'zin'; s.textContent = 'داخل مساحة الإجابة'; s.style.cssText = 'position:absolute;left:' + (ar.left - r.left) + 'px;top:' + (ar.top - r.top + pad) + 'px;width:' + ar.width + 'px;height:' + Math.max(28, ar.height) + 'px'; z.appendChild(s); }
       pagesBox.appendChild(z);
     }
 
@@ -626,6 +641,19 @@
 
     /* أدوات المعاينة */
     M.qsa('#sd-view button', app).forEach(function (b) { b.onclick = function () { view = b.dataset.v; M.qsa('#sd-view button', app).forEach(function (x) { x.classList.toggle('on', x === b); }); renderPaper(); }; });
+    function fntUI() {
+      var v = M.qs('#sd-fsv', app); if (v) v.textContent = e.largePrint ? 'مكبّر' : n(Number(e.fontSize) || 14);
+      var bb = M.qs('#sd-bold', app); if (bb) { bb.classList.toggle('on', !!e.boldText); bb.setAttribute('aria-pressed', e.boldText ? 'true' : 'false'); }
+    }
+    function bumpFont(d) {
+      if (e.largePrint || e.compact) { e.largePrint = false; e.compact = false; }
+      e.fontSize = Math.max(11, Math.min(24, (Number(e.fontSize) || 14) + d));
+      fntUI(); touch(tab === 'tpl');
+    }
+    M.qs('#sd-fsm', app).onclick = function () { bumpFont(-1); };
+    M.qs('#sd-fsp', app).onclick = function () { bumpFont(1); };
+    M.qs('#sd-bold', app).onclick = function () { e.boldText = !e.boldText; fntUI(); touch(tab === 'tpl'); M.toast(e.boldText ? 'الخط عريض للامتحان كله' : 'رجع الخط عادي', 'ok'); };
+    fntUI();
     M.qs('#sd-zi', app).onclick = function () { zoom = Math.min(3, (zoom || 1) * 1.25); renderPaper(); };
     M.qs('#sd-zo', app).onclick = function () { zoom = Math.max(0.4, (zoom || 1) / 1.25); renderPaper(); };
     M.qs('#sd-zf', app).onclick = function () { zoom = 0; renderPaper(); };

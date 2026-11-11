@@ -177,15 +177,26 @@
   }
   M._fig = fig;
   /* موضع الشكل: تحت السؤال (افتراضي) · فوقه · بجانبه يساراً أو يميناً · بعد مساحة الإجابة */
+  /* مساحة إجابة: سطور منقّطة أو شبكة مربعات بنفس الارتفاع */
+  function ansArea(k, grid, cls) {
+    if (grid) return '<div class="p-ansg' + (cls ? ' ' + cls : '') + '"><div class="p-draw grid" style="height:calc(var(--pfs,14px) * ' + (1.75 * k + 0.14 * (k - 1)).toFixed(2) + ')"></div></div>';
+    var li = ''; for (var i = 0; i < k; i++) li += '<i></i>';
+    return '<div class="p-lines' + (cls ? ' ' + cls : '') + '">' + li + '</div>';
+  }
+  M._ansArea = ansArea;
   function solLines(q) {
     var k = Math.max(0, Math.min(30, Number(q.solLines) || 0)); if (!k) return '';
-    var li = ''; for (var i = 0; i < k; i++) li += '<i></i>';
-    return '<div class="p-lines p-sol">' + li + '</div>';
+    return ansArea(k, !!q.ansGrid, 'p-sol');
   }
   function place(q, st, rest) {
     rest = rest + solLines(q);
     if (!q.figure) return st + rest;
     var pos = q.figurePos || 'below';
+    if (pos === 'inside') {
+      if (!rest) return st + fig(q);
+      /* الصورة داخل مساحة الإجابة (فوق السطور أو الشبكة) */
+      return st + '<div class="p-inwrap"><div class="p-inarea">' + rest + '</div><div class="p-infig a-' + (q.figureAlign || 'center') + ' v-' + (q.figureVAlign || 'top') + '">' + figBox(q, Number(q.figureWidth) || 40) + '</div></div>';
+    }
     if (pos === 'above') return fig(q) + st + rest;
     if (pos === 'after') return st + rest + fig(q);
     if (pos === 'side' || pos === 'side-start') {
@@ -254,10 +265,9 @@
         h += '<div class="p-item" data-q="' + q.id + '">' + place(q, '<div class="st">' + no + '<span>' + c.rich(q.text) + '</span></div>',
           '<div class="p-draw' + (q.drawGrid !== false ? ' grid' : '') + '" style="height:' + (Number(q.drawHeight) || 140) + 'px"></div>') + '</div>';
       } else {
-        var lines = Math.max(0, Number(q.lines) || 0), li = '';
-        for (var i = 0; i < lines; i++) li += '<i></i>';
+        var lines = Math.max(0, Number(q.lines) || 0);
         var pre = sec.type === 'reason' && !/^\s*علل/.test(q.text) && !c.en ? '' : '';
-        h += '<div class="p-item" data-q="' + q.id + '">' + place(q, '<div class="st">' + no + '<span>' + pre + c.rich(q.text) + '</span></div>', lines ? '<div class="p-lines">' + li + '</div>' : '') + '</div>';
+        h += '<div class="p-item" data-q="' + q.id + '">' + place(q, '<div class="st">' + no + '<span>' + pre + c.rich(q.text) + '</span></div>', lines ? ansArea(lines, !!q.ansGrid) : '') + '</div>';
       }
     });
     return h;
@@ -284,7 +294,7 @@
 
   function pageShell(c) {
     var e = c.exam;
-    var cls = 'page' + (c.en ? ' ltr' : '') + (e.compact && !e.largePrint ? ' compact' : '') + (e.largePrint ? ' large' : '') + (e.separator === 'dashed' ? ' sep-dashed' : '') + ' th-' + (e.theme || 'classic');
+    var cls = 'page' + (c.en ? ' ltr' : '') + (e.compact && !e.largePrint ? ' compact' : '') + (e.largePrint ? ' large' : '') + (e.separator === 'dashed' ? ' sep-dashed' : '') + (e.boldText ? ' bold-all' : '') + ' th-' + (e.theme || 'classic');
     var style = '--pc:' + (e.color || '#1F2A44') + ';' + (e.compact || e.largePrint ? '' : '--pfs:' + (Number(e.fontSize) || 14) + 'px;') +
       (e.font ? '--pfont:' + e.font + ';' : '');
     var el = document.createElement('div');

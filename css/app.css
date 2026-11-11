@@ -477,7 +477,7 @@ body{background:radial-gradient(1200px 500px at 100% -10%,#E7F2EF 0,transparent 
 .figbox>img{width:120px;height:96px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:10px;flex:none}
 .fb-b{flex:1;min-width:220px;display:flex;flex-direction:column;gap:8px}
 .fb-b input[type=range]{width:100%;accent-color:var(--accent)}
-.pos-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.pos-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .pos-grid .pt{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 2px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font:inherit;font-size:11.5px}
 .pos-grid .pt.on{border-color:var(--red);background:var(--red-s);color:var(--red-d);font-weight:700}
 .pg{display:grid;width:34px;height:26px;gap:2px}
@@ -590,3 +590,16 @@ body{background:radial-gradient(1200px 500px at 100% -10%,#E7F2EF 0,transparent 
 .about-card .ab-t b{font-size:20px;direction:ltr;text-align:start;font-family:"Plex Arabic",sans-serif}
 .about-card .ab-t span{font-size:12.5px;color:var(--muted)}
 .symgrid[hidden],[hidden]{display:none!important}
+
+/* الصورة داخل مساحة الإجابة — أيقونة الموضع */
+.pt-inside .pg{grid-template-rows:repeat(4,minmax(0,1fr));position:relative}
+.pt-inside .pg i{border-bottom:1.5px dotted #A7B2C5;background:transparent;height:0;align-self:center;width:100%}
+.pt-inside .pg b{position:absolute;inset:6px 30% 4px 30%;opacity:.85}
+.fig-bar{width:max-content;max-width:none}
+.fig-zones .zin{border-color:#1D4ED8;background:rgba(29,78,216,.10);color:#1E3A8A}
+/* خط الامتحان كله: تكبير/تصغير/عريض */
+.sd-fnt{display:flex;align-items:center;gap:2px;border:1px solid var(--line);border-radius:10px;padding:1px 3px;margin-inline-end:6px;background:#fff}
+.sd-fnt .btn{min-width:30px;font-weight:700;font-family:Arial,sans-serif;font-size:13px}
+.sd-fnt #sd-fsv{min-width:26px;text-align:center;font-size:12.5px;font-weight:700;color:var(--accent-d)}
+.sd-fnt #sd-bold.on{background:var(--accent);color:#fff}
+@media (max-width:560px){.sd-ptools{overflow-x:auto;scrollbar-width:none}.sd-ptools::-webkit-scrollbar{display:none}.sd-ptools .sd-pc{display:none}.sd-ptools #sd-zf{display:none}.sd-fnt{margin-inline-end:2px}.sd-fnt .btn{min-width:28px;padding:0 4px}}

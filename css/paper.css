@@ -260,3 +260,21 @@ u.ans{text-decoration:none;border-bottom:1.5px solid #1D4ED8;color:#1E3A8A;paddi
 .pdf-host .sheet-in{box-shadow:none!important}
 .pdf-host .sheet-in::after{border-left-color:#E5E7EB}
 .pdf-host .sd-hl{outline:0!important;background:none!important}
+
+/* خط عريض للامتحان كله */
+.page.bold-all,.page.bold-all *{font-weight:700!important}
+/* مساحة إجابة بالمربعات */
+.p-ansg{padding-inline-start:0}
+.p-ansg.p-sol::before{content:"الحل:";display:block;font-size:.86em;color:#6B7280;line-height:1.4;margin-inline-start:22px}
+.page.ltr .p-ansg.p-sol::before{content:"Working:"}
+/* الصورة داخل مساحة الإجابة */
+.p-inwrap{display:grid;margin-top:2px}
+.p-inwrap>.p-inarea,.p-inwrap>.p-infig{grid-area:1/1;min-width:0}
+.p-inarea{display:flex;flex-direction:column}
+.p-inarea>.p-draw,.p-inarea>.p-ansg{flex:1;display:flex;flex-direction:column}
+.p-inarea>.p-ansg>.p-draw{flex:1}
+.p-infig{display:flex;justify-content:center;padding:6px 10px 6px 10px;padding-inline-start:32px;pointer-events:auto}
+.p-infig.a-start{justify-content:flex-start}.p-infig.a-end{justify-content:flex-end}
+.p-infig.v-top{align-self:start}.p-infig.v-middle{align-self:center}.p-infig.v-bottom{align-self:end}
+.p-infig img{width:100%;max-height:420px;object-fit:contain;display:block;mix-blend-mode:multiply}
+.p-infig .cap{text-align:center;font-size:.86em;margin-top:2px;color:#374151}

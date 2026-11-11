@@ -1,5 +1,5 @@
 /* معيار — Service Worker (مولَّد تلقائياً بواسطة tools/release.js — لا تعدّله يدوياً) */
-var VERSION = '2.0.3';
+var VERSION = '2.0.4';
 var CACHE = 'miyar-' + VERSION;
 var FILES = [
   "./config.json",

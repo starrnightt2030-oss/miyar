@@ -1,5 +1,5 @@
 /* معيار — Service Worker (مولَّد تلقائياً بواسطة tools/release.js — لا تعدّله يدوياً) */
-var VERSION = '1.4.1';
+var VERSION = '2.0.0';
 var CACHE = 'miyar-' + VERSION;
 var FILES = [
   "./config.json",
@@ -20,6 +20,7 @@ var FILES = [
   "./fonts/plex-lat-500.woff2",
   "./fonts/plex-lat-600.woff2",
   "./fonts/plex-lat-700.woff2",
+  "./icons/apple-touch-icon.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png",
@@ -33,12 +34,16 @@ var FILES = [
   "./js/draw.js",
   "./js/exchange.js",
   "./js/generator.js",
+  "./js/identity.js",
+  "./js/imgtools.js",
+  "./js/import.js",
   "./js/install.js",
   "./js/math.js",
   "./js/paper.js",
   "./js/safety.js",
   "./js/sound.js",
   "./js/store.js",
+  "./js/studio.js",
   "./js/update.js",
   "./js/util.js",
   "./js/version.js",

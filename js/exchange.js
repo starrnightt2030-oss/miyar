@@ -33,8 +33,8 @@
 
   M.parsePack = function (text) {
     var p;
-    try { p = JSON.parse(text); } catch (e) { return Promise.reject(new Error('الملف ليس حزمة معيار صالحة')); }
-    if (!p || p.format !== 'miyar-pack' || !p.data) return Promise.reject(new Error('الملف ليس حزمة معيار صالحة'));
+    try { p = JSON.parse(text); } catch (e) { return Promise.reject(new Error('الملف ليس حزمة Exam Studio صالحة')); }
+    if (!p || p.format !== 'miyar-pack' || !p.data) return Promise.reject(new Error('الملف ليس حزمة Exam Studio صالحة'));
     return M.hash(JSON.stringify(p.data)).then(function (h) { p.intact = h === p.hash; return p; });
   };
 
@@ -93,7 +93,7 @@
   M.backup = function () {
     return M.buildPack('backup').then(function (txt) {
       M.setSetting('lastBackupAt', M.now());
-      M.download('نسخة-احتياطية-معيار-' + M.today() + '.miyar', new Blob([txt], { type: 'application/json' }));
+      M.download('نسخة-احتياطية-ExamStudio-' + M.today() + '.miyar', new Blob([txt], { type: 'application/json' }));
     });
   };
   M.restore = function (p) {
@@ -168,7 +168,7 @@
   var TYPE_BY_LABEL = {}; M.TYPES.forEach(function (t) { TYPE_BY_LABEL[M.norm(t.label)] = t.id; });
   TYPE_BY_LABEL[M.norm('اختر')] = 'mcq'; TYPE_BY_LABEL[M.norm('صواب وخطأ')] = 'tf'; TYPE_BY_LABEL[M.norm('صل')] = 'match'; TYPE_BY_LABEL[M.norm('علل')] = 'reason';
 
-  /* استيراد من Excel: يقبل ملفات معيار وجداول بسيطة (السؤال + أ ب ج د + الإجابة) */
+  /* استيراد من Excel: يقبل ملفات Exam Studio وجداول بسيطة (السؤال + أ ب ج د + الإجابة) */
   M.importBankExcel = function (buffer, defaults) {
     var XLSX = window.XLSX;
     var wb = XLSX.read(buffer, { type: 'array' });

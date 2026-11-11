@@ -14,67 +14,138 @@
       status: 'draft', model: '', groupId: '', scopeLessonIds: [], shuffleSeed: M.uid(), preparedBy: M.me().name || '' };
   };
 
+  M.EXAM_TITLES = EXAM_TITLES;
+  /* إعدادات الورقة الافتراضية من «هوية المؤسسة» */
+  M.examDefaults = function () {
+    var d = S.settings.examDefaults || {};
+    return { theme: d.theme || 'classic', color: d.color || '#1F2A44', fontSize: d.fontSize || 14, duration: d.duration || 'ساعتان', className: d.className || '', specialization: d.specialization || '', itemSep: d.itemSep || 'space' };
+  };
+
+  /* ===== بطاقة امتحان ===== */
+  M.examCard = function (e) {
+    var qn = e.sections.reduce(function (t, s) { return t + s.items.length; }, 0);
+    return '<div class="ex-card" data-open="' + e.id + '"><div class="ex-thumb" aria-hidden="true"><span class="t th-' + esc(e.theme || 'classic') + '" style="--pc:' + esc(e.color || '#1F2A44') + '"><i></i><i></i><i></i><i></i><i></i></span></div>' +
+      '<div class="ex-b"><b>' + esc(e.title || 'امتحان') + (e.model ? ' — نموذج ' + esc(e.model) : '') + '</b><span class="small muted">' + esc(M.examSubject(e) || 'بدون مادة') + (e.className ? ' · ' + esc(e.className) : '') + '</span>' +
+      '<span class="small muted">' + n(M.secInfo(e).groups.length) + ' أسئلة · ' + n(qn) + ' فرع · ' + n(M.examTotal(e)) + ' درجة · ' + n(M.fmtDate(e.updatedAt)) + '</span></div>' +
+      '<button class="btn icon ghost sm" data-menu="' + e.id + '" aria-label="خيارات">' + I('more', 18) + '</button></div>';
+  };
+  M.bindExamCards = function (root) {
+    M.qsa('[data-open]', root).forEach(function (c) { c.onclick = function (ev) { if (ev.target.closest('[data-menu]')) return; M.go('#/studio/' + c.dataset.open); }; });
+    M.qsa('[data-menu]', root).forEach(function (b) {
+      b.onclick = function () {
+        var e = M.byId('exams', b.dataset.menu); if (!e) return;
+        M.modal({ title: e.title || 'امتحان', body: '<div style="display:flex;flex-direction:column;gap:8px">' +
+          [['open', 'edit', 'فتح في الاستوديو'], ['dup', 'copy', 'نسخة مكررة للتعديل'], ['tpl', 'copy', 'امتحان جديد بنفس التنسيق (بدون أسئلة)'], ['file', 'download', 'حفظ كملف لمشاركته'], ['del', 'trash', 'حذف']].map(function (a) {
+            return '<button class="btn' + (a[0] === 'del' ? ' danger' : '') + '" data-a="' + a[0] + '" style="justify-content:flex-start">' + I(a[1]) + ' ' + a[2] + '</button>'; }).join('') + '</div>',
+          onMount: function (m, close) {
+            M.qsa('[data-a]', m).forEach(function (x) {
+              x.onclick = function () {
+                close(); var a = x.dataset.a;
+                if (a === 'open') M.go('#/studio/' + e.id);
+                if (a === 'dup' || a === 'tpl') { var ne = M.cloneExam(e, a === 'tpl'); M.save('exams', ne).then(function () { M.go('#/studio/' + ne.id); }); }
+                if (a === 'file') M.exportExamFile(e);
+                if (a === 'del') M.confirm('حذف الامتحان', 'حذف «' + (e.title || 'امتحان') + '» نهائياً؟', 'حذف', true).then(function (ok) { if (ok) M.remove('exams', e.id).then(function () { M.toast('حُذف'); M.render(); }); });
+              };
+            });
+          } });
+      };
+    });
+  };
+  M.cloneExam = function (e, emptyQuestions) {
+    var ne = JSON.parse(JSON.stringify(e));
+    ne.id = M.uid(); ne.status = 'draft'; ne.frozen = null; ne.approvedAt = null; ne.shuffleSeed = M.uid(); ne.groupId = ''; ne.model = '';
+    delete ne.ver; delete ne.createdAt; delete ne.updatedAt; delete ne.syncedAt; delete ne.cloudAt;
+    /* أسئلة مستقلة عن الأصل */
+    var map = {}, local = {};
+    ne.sections.forEach(function (s) {
+      s.id = M.uid();
+      s.items = emptyQuestions ? [] : s.items.map(function (it) {
+        var q = M.examQ(e, it.qid); if (!q) return null;
+        var c = JSON.parse(JSON.stringify(q)); c.id = M.uid(); local[c.id] = c; map[it.qid] = c.id;
+        return Object.assign({}, it, { qid: c.id });
+      }).filter(Boolean);
+    });
+    if (emptyQuestions) ne.sections = ne.sections.map(function (s) { var q = M.newQuestion(s.type, ''); q.grade = M.TYPE[s.type].grade; local[q.id] = q; s.items = [{ qid: q.id, grade: null }]; return s; });
+    ne.local = local; ne.title = emptyQuestions ? ne.title : ne.title + ' (نسخة)';
+    return ne;
+  };
+  M.exportExamFile = function (e) {
+    var data = { kind: 'miyar-exam', app: 'miyar', ver: M.VERSION, at: M.now(), exam: e, local: e.local || {} };
+    M.download(JSON.stringify(data), (e.title || 'امتحان') + (e.model ? ' - ' + e.model : '') + '.miyar-exam.json', 'application/json');
+  };
+  M.importExamFile = function () {
+    return M.pickFile('.json,application/json').then(function (f) {
+      if (!f[0]) return null;
+      return M.readFile(f[0], 'text').then(function (t) {
+        var d; try { d = JSON.parse(t); } catch (x) { throw new Error('الملف ليس ملف امتحان صالحاً'); }
+        var src = d.kind === 'miyar-exam' ? d.exam : (d.sections ? d : null);
+        if (!src || !src.sections) throw new Error('الملف ليس ملف امتحان من Exam Studio');
+        var ne = M.cloneExam(src, false); ne.title = src.title || 'امتحان';
+        return M.save('exams', ne).then(function () { return ne; });
+      });
+    });
+  };
+
   /* ===== القائمة ===== */
   M.views.exams = function (main) {
     var list = S.exams.slice().sort(function (a, b) { return a.updatedAt < b.updatedAt ? 1 : -1; });
-    var groups = [], seen = {};
-    list.forEach(function (e) {
-      var k = e.groupId || e.id;
-      if (!seen[k]) { seen[k] = { key: k, exams: [] }; groups.push(seen[k]); }
-      seen[k].exams.push(e);
-    });
-    var rows = groups.map(function (g) {
-      g.exams.sort(function (a, b) { return String(a.model).localeCompare(String(b.model), 'ar'); });
-      var e0 = g.exams[0], sub = M.byId('subjects', e0.subjectId);
-      return '<div class="card" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center"><div style="flex:1;min-width:220px"><b>' + esc(e0.title || 'امتحان') + '</b><div class="small muted">مادة ' + esc(sub ? sub.name : '') + ' · ' + esc(e0.className || '') + ' · ' + n(M.fmtDate(e0.updatedAt)) + '</div></div>' +
-        '<div class="row" style="gap:6px">' + g.exams.map(function (e) {
-          return '<a class="btn sm" href="#/exam/' + e.id + '">' + (e.model ? 'نموذج ' + esc(e.model) : 'فتح') + ' ' + (e.status === 'approved' ? '<span class="chip ok">معتمد</span>' : '<span class="chip warn">مسودة</span>') + '</a>';
-        }).join('') + '</div></div>';
-    }).join('');
-    main.innerHTML = M.topbar('الامتحانات', n(list.length) + ' ورقة', '<button class="btn pri" id="ex-new">' + I('plus') + ' امتحان جديد</button>') +
-      '<div class="content">' + (rows || '<div class="empty">لا توجد امتحانات بعد — اضغط «امتحان جديد» واختر: من بنك الأسئلة أو كتابة يدوية.</div>') + '</div>';
+    var q = (M._exQ || '').trim();
+    var shown = q ? list.filter(function (e) { return (e.title + ' ' + M.examSubject(e) + ' ' + (e.className || '')).indexOf(q) >= 0; }) : list;
+    main.innerHTML = M.topbar('امتحاناتي', n(list.length) + ' ورقة', '<button class="btn" id="ex-file">' + I('merge') + ' فتح ملف</button><button class="btn pri" id="ex-new">' + I('plus') + ' امتحان جديد</button>') +
+      '<div class="content">' + (list.length > 4 ? '<input class="inp" id="ex-q" placeholder="بحث بالاسم أو المادة أو الصف" value="' + esc(q) + '">' : '') +
+      (shown.length ? '<div class="ex-grid">' + shown.map(M.examCard).join('') + '</div>' : '<div class="empty">' + (q ? 'لا نتائج' : 'لا توجد امتحانات بعد — اضغط «امتحان جديد».') + '</div>') + '</div>';
     M.qs('#ex-new', main).onclick = function () { M.newExamWizard(); };
+    M.qs('#ex-file', main).onclick = function () { M.importExamFile().then(function (e) { if (e) { M.toast('تم فتح الملف', 'ok'); M.go('#/studio/' + e.id); } }).catch(function (er) { M.toast(er.message, 'bad'); }); };
+    var qi = M.qs('#ex-q', main); if (qi) qi.oninput = M.debounce(function () { M._exQ = qi.value; M.render(); setTimeout(function () { var x = M.qs('#ex-q'); if (x) { x.focus(); x.selectionStart = x.value.length; } }, 0); }, 300);
+    M.bindExamCards(main);
   };
 
-  /* ===== معالج امتحان جديد: من البنك (تلقائي أو اختيار يدوي) أو كتابة يدوية ===== */
+  /* ===== امتحان جديد: فارغ · من امتحان سابق · من أسئلة مكتوبة أو مصوّرة (ذكاء اصطناعي) ===== */
   M.newExamWizard = function (preMode) {
-    var mode = preMode || '';
-    var subjOpts = S.subjects.map(function (s) { return '<option value="' + s.id + '">' + esc(s.name) + (s.className ? ' — ' + esc(s.className) : '') + '</option>'; }).join('');
-    var card = function (k, icon, t, d) { return '<button type="button" class="path-card' + (mode === k ? ' on' : '') + '" data-mode="' + k + '"><span class="pc-ic">' + I(icon, 26) + '</span><b>' + t + '</b><span>' + d + '</span></button>'; };
+    var mode = preMode || 'blank', D = M.examDefaults();
+    var prev = S.exams.slice().sort(function (a, b) { return a.updatedAt < b.updatedAt ? 1 : -1; });
+    var card = function (k, icon, t, d) { return '<button type="button" class="path-card' + (mode === k ? ' on' : '') + '" data-mode="' + k + '"><span class="pc-ic">' + I(icon, 24) + '</span><b>' + t + '</b><span>' + d + '</span></button>'; };
     M.modal({ title: 'امتحان جديد', wide: true,
       body: '<div class="path-grid">' +
-        card('auto', 'spark', 'من البنك — تلقائياً', 'حدّد الدروس وهيكل الورقة، ويولّد التطبيق حتى ٣ نماذج متكافئة من الأسئلة المعتمدة') +
-        card('bank', 'bank', 'من البنك — أختار بنفسي', 'أضيف الأسئلة الرئيسية وأختار فروعها من البنك، وأتحكم في الدرجات والترتيب') +
-        card('manual', 'edit', 'يدوي — أكتب الأسئلة', 'أختار نوع كل سؤال وأكتبه مباشرة في الورقة (فرع واحد أو أجزاء أ، ب)، مع الرسومات والدرجات') + '</div>' +
-        '<div id="nw-sub" class="grid2" style="margin-top:14px;display:none"><div class="field"><label for="nw-s">المادة</label><select id="nw-s" class="inp">' + subjOpts + '<option value="__other">مادة أخرى — أكتب اسمها</option></select></div>' +
-        '<div class="field" id="nw-on-f" style="display:none"><label for="nw-on">اسم المادة</label><input id="nw-on" class="inp"></div>' +
-        '<div class="field"><label for="nw-t">اسم الامتحان</label><input id="nw-t" class="inp" list="nw-tl" value="' + esc(EXAM_TITLES[0]) + '"><datalist id="nw-tl">' + EXAM_TITLES.map(function (t) { return '<option value="' + esc(t) + '">'; }).join('') + '</datalist></div></div>',
-      foot: '<button class="btn pri" data-ok disabled>متابعة</button><button class="btn" data-x>إلغاء</button>',
+        card('blank', 'edit', 'ورقة جديدة', 'تختار نوع كل سؤال وتكتبه، والورقة تتنسّق أمامك') +
+        card('import', 'spark', 'من أسئلة جاهزة', 'الصق نص الأسئلة أو صوّرها، والذكاء الاصطناعي يحوّلها لأسئلة منسقة') +
+        card('copy', 'copy', 'من امتحان سابق', 'نفس التنسيق والأسئلة لتعدّل عليها، أو نفس الهيكل بأسئلة فارغة') + '</div>' +
+        '<div id="nw-copy" style="display:none;margin-top:12px"><div class="grid2"><div class="field"><label for="nw-src">الامتحان المصدر</label><select id="nw-src" class="inp">' + prev.map(function (e) { return '<option value="' + e.id + '">' + esc((e.title || 'امتحان') + ' — ' + (M.examSubject(e) || '') + (e.className ? ' — ' + e.className : '')) + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><span class="lbl">الأسئلة</span><div class="seg" id="nw-cq"><button type="button" data-v="keep" class="on">انسخ الأسئلة</button><button type="button" data-v="empty">الهيكل فقط</button></div></div></div></div>' +
+        '<div id="nw-meta" class="grid2" style="margin-top:12px">' +
+        '<div class="field"><label for="nw-t">اسم الامتحان</label><input id="nw-t" class="inp" list="nw-tl" value="' + esc(EXAM_TITLES[0]) + '"><datalist id="nw-tl">' + EXAM_TITLES.map(function (t) { return '<option value="' + esc(t) + '">'; }).join('') + '</datalist></div>' +
+        '<div class="field"><label for="nw-sn">المادة</label><input id="nw-sn" class="inp" list="nw-sl" placeholder="مثال: الكهرباء العامة"><datalist id="nw-sl">' + uniq(S.exams.map(M.examSubject).concat(S.subjects.map(function (x) { return x.name; }))).map(function (t) { return '<option value="' + esc(t) + '">'; }).join('') + '</datalist></div>' +
+        '<div class="field"><label for="nw-c">الصف الدراسي</label><input id="nw-c" class="inp" list="nw-cl" value="' + esc(D.className) + '" placeholder="الصف الأول"><datalist id="nw-cl"><option value="الصف الأول"><option value="الصف الثاني"><option value="الصف الثالث"></datalist></div>' +
+        '<div class="field"><label for="nw-sp">التخصص</label><input id="nw-sp" class="inp" value="' + esc(D.specialization) + '"></div></div>',
+      foot: '<button class="btn pri" data-ok>' + I('check') + ' ابدأ</button><button class="btn" data-x>إلغاء</button>',
       onMount: function (m, close) {
-        var ok = M.qs('[data-ok]', m), sub = M.qs('#nw-sub', m), sel = M.qs('#nw-s', m);
+        var cq = 'keep';
         var sync = function () {
           M.qsa('[data-mode]', m).forEach(function (b) { b.classList.toggle('on', b.dataset.mode === mode); });
-          sub.style.display = mode && mode !== 'auto' ? '' : 'none';
-          M.qs('#nw-on-f', m).style.display = sel.value === '__other' ? '' : 'none';
-          ok.disabled = !mode; ok.textContent = mode === 'auto' ? 'متابعة إلى التوليد' : 'إنشاء الامتحان';
+          M.qs('#nw-copy', m).style.display = mode === 'copy' ? '' : 'none';
+          M.qs('#nw-meta', m).style.display = mode === 'copy' && cq === 'keep' ? 'none' : '';
         };
-        if (!S.subjects.length) sel.value = '__other';
-        M.qsa('[data-mode]', m).forEach(function (b) { b.onclick = function () { mode = b.dataset.mode; if (mode === 'auto' && !S.subjects.length) { M.toast('التوليد التلقائي يحتاج مادة وأسئلة معتمدة في البنك', 'bad'); mode = ''; } sync(); }; });
-        sel.onchange = sync; sync();
-        ok.onclick = function () {
-          if (mode === 'auto') { close(); M.go('#/gen'); return; }
-          var sid = sel.value === '__other' ? '' : sel.value, sname = M.qs('#nw-on', m).value.trim();
-          if (!sid && !sname) return M.toast('اختر المادة أو اكتب اسمها', 'bad');
-          var e = M.newExam(sid); e.mode = mode; e.title = M.qs('#nw-t', m).value.trim() || e.title;
-          if (!sid) e.subjectName = sname;
-          e.sections = [];
-          M.save('exams', e).then(function () { close(); M.go('#/exam/' + e.id + '?step=questions'); });
+        M.qsa('[data-mode]', m).forEach(function (b) { b.onclick = function () { if (b.dataset.mode === 'copy' && !prev.length) return M.toast('لا توجد امتحانات سابقة بعد', 'bad'); mode = b.dataset.mode; sync(); }; });
+        M.qsa('#nw-cq button', m).forEach(function (b) { b.onclick = function () { cq = b.dataset.v; M.qsa('#nw-cq button', m).forEach(function (x) { x.classList.toggle('on', x === b); }); sync(); }; });
+        sync();
+        M.qs('[data-ok]', m).onclick = function () {
+          var e;
+          if (mode === 'copy') {
+            var src = M.byId('exams', M.qs('#nw-src', m).value); if (!src) return;
+            e = M.cloneExam(src, cq === 'empty');
+            if (cq === 'empty') { e.title = M.qs('#nw-t', m).value.trim() || src.title; e.subjectName = M.qs('#nw-sn', m).value.trim() || M.examSubject(src); e.subjectId = ''; e.className = M.qs('#nw-c', m).value.trim(); e.specialization = M.qs('#nw-sp', m).value.trim(); }
+          } else {
+            e = M.newExam(''); var D2 = M.examDefaults();
+            e.mode = 'manual'; e.theme = D2.theme; e.color = D2.color; e.fontSize = D2.fontSize; e.duration = D2.duration; e.itemSep = D2.itemSep;
+            e.title = M.qs('#nw-t', m).value.trim() || e.title; e.subjectName = M.qs('#nw-sn', m).value.trim();
+            e.className = M.qs('#nw-c', m).value.trim(); e.specialization = M.qs('#nw-sp', m).value.trim();
+            e.sections = [];
+          }
+          M.save('exams', e).then(function () { close(); M.go('#/studio/' + e.id + (mode === 'import' ? '?import=1' : '')); });
         };
       } });
   };
-
-  /* ===== توليد النماذج ===== */
-  var BP_DEFAULT = [{ type: 'mcq', count: 5, itemGrade: 1 }, { type: 'tf', count: 5, itemGrade: 1 }, { type: 'complete', count: 4, itemGrade: 1 }, { type: 'reason', count: 2, itemGrade: 2 }, { type: 'essay', count: 1, itemGrade: 4 }];
+  function uniq(a) { var o = {}, r = []; a.forEach(function (x) { if (x && !o[x]) { o[x] = 1; r.push(x); } }); return r; }
 
   M.views.gen = function (main, r) {
     var subjects = S.subjects;
@@ -329,7 +400,7 @@
 
     function formatHTML() {
       var fonts = [['', 'نسخ (افتراضي)'], ['"Plex Arabic"', 'بلكس عربي'], ['"Traditional Arabic","Naskh"', 'Traditional Arabic'], ['"Simplified Arabic","Naskh"', 'Simplified Arabic'], ['Arial', 'Arial'], ['"Times New Roman"', 'Times New Roman']];
-      var colors = ['#1F2A44', '#0E7C6B', '#1E3A8A', '#7C2D12', '#4C1D95', '#111827'];
+      var colors = ['#1F2A44', '#1D4ED8', '#1E3A8A', '#7C2D12', '#4C1D95', '#111827'];
       var tg = function (k, label) { return '<label class="check"><input type="checkbox" data-tg="' + k + '"' + (e[k] !== false ? ' checked' : '') + '> ' + label + '</label>'; };
       var themes = [['classic', 'رسمي'], ['modern', 'حديث'], ['minimal', 'بسيط']];
       return '<div class="card" style="display:flex;flex-direction:column;gap:14px"><div class="grid2">' +

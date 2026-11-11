@@ -19,8 +19,8 @@
     enroll: function () {
       var me = M.me();
       return navigator.credentials.create({ publicKey: {
-        challenge: rand(32), rp: { name: 'معيار' },
-        user: { id: rand(16), name: (me.name || 'user') + '@miyar', displayName: me.name || 'مستخدم معيار' },
+        challenge: rand(32), rp: { name: 'Exam Studio' },
+        user: { id: rand(16), name: (me.name || 'user') + '@miyar', displayName: me.name || 'مستخدم Exam Studio' },
         pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
         authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged' },
         timeout: 60000, attestation: 'none'
@@ -51,20 +51,20 @@
   function authShell(inner, foot) {
     var cen = S.settings.center || {};
     return '<div class="auth"><aside class="auth-hero"><div class="ah-in">' +
-      '<div class="ah-brand">' + (cen.logo ? '<img src="' + cen.logo + '" alt="">' : '<span class="ah-mark">' + I('exam', 30) + '</span>') + '<div><b>معيار</b><span>' + esc(cen.name || 'بنك الأسئلة وتصميم الامتحانات') + '</span></div></div>' +
-      '<h1>امتحانات احترافية<br>من بنك أسئلة موثّق</h1>' +
-      '<ul class="ah-list"><li>' + I('bank', 18) + ' بنك أسئلة مرتبط بالدروس ونواتج التعلم</li><li>' + I('exam', 18) + ' أوراق A4 وA3 بترويسة وثيقة الجودة</li><li>' + I('spark', 18) + ' توليد الأسئلة من صور شرح الدرس</li><li>' + I('lock', 18) + ' يعمل بدون إنترنت — وبياناتك على جهازك</li></ul>' +
-      '<div class="ah-foot">ISO 21001 · v' + esc(M.VERSION) + '</div></div></aside>' +
-      '<main class="auth-main"><div class="auth-card">' + inner + '</div>' + (foot || '') + '</main></div>';
+      '<div class="ah-brand">' + (cen.logo ? '<img src="' + cen.logo + '" alt="">' : '<span class="ah-mark">' + I('exam', 30) + '</span>') + '<div><b>Exam Studio</b><span>' + esc(cen.name || 'استوديو الامتحانات') + '</span></div></div>' +
+      '<h1>صمّم امتحانك<br>وشاهده يتنسّق أمامك</h1>' +
+      '<ul class="ah-list"><li>' + I('exam', 18) + ' الورقة بجانب التحرير — كل تعديل يظهر لحظياً</li><li>' + I('palette', 18) + ' ستة قوالب احترافية بترويسة وثيقة الجودة</li><li>' + I('spark', 18) + ' حوّل أسئلة مكتوبة أو مصوّرة بالذكاء الاصطناعي</li><li>' + I('lock', 18) + ' يعمل بدون إنترنت — وبياناتك على جهازك</li></ul>' +
+      M.creditHTML('light') + '<div class="ah-foot">v' + esc(M.VERSION) + '</div></div></aside>' +
+      '<main class="auth-main"><div class="auth-card">' + inner + '</div>' + (foot || '') + '<div class="auth-credit">' + M.creditHTML() + '</div></main></div>';
   }
 
   /* ===== الإعداد الأول ===== */
   M.views.setup = function (app) {
     var st = { role: 'teacher', bio: false };
     app.innerHTML = authShell(
-      '<div class="ac-head"><h2>مرحباً بك في معيار</h2><p>إعداد هذا الجهاز — دقيقة واحدة</p></div>' +
+      '<div class="ac-head"><h2>مرحباً بك في Exam Studio</h2><p>إعداد هذا الجهاز — دقيقة واحدة</p></div>' +
       '<div class="field"><label for="su-name">اسمك</label><input id="su-name" class="inp lg" placeholder="مثال: أ. محمد علي" autocomplete="name"></div>' +
-      '<div class="field"><span class="lbl">دورك على هذا الجهاز</span><div class="role-pick">' +
+      '<div class="field" hidden><span class="lbl">دورك على هذا الجهاز</span><div class="role-pick">' +
       '<button type="button" data-r="teacher" class="on">' + I('edit', 22) + 'مدرس<small>يبني بنك أسئلة مادته ويرسله</small></button>' +
       '<button type="button" data-r="head">' + I('review', 22) + 'رئيس قسم<small>يراجع ويعتمد الأسئلة</small></button>' +
       '<button type="button" data-r="admin">' + I('merge', 22) + 'مدير النظام<small>يجمع ويصدّر ويدير الجودة</small></button></div></div>' +

@@ -20,33 +20,36 @@
     return s + (qs ? '?' + qs : '');
   };
 
+  /* الإصدار ٢: التطبيق يركّز على تصميم الامتحانات يدوياً — بنك الأسئلة «قريباً» */
   function navItems() {
-    var r = M.role(), pend = M.pendingReview().length;
-    var items = [
+    return [
       { k: 'home', label: 'الرئيسية', icon: 'home' },
-      { k: 'bank', label: 'بنك الأسئلة', icon: 'bank' },
-      { k: 'exams', label: 'الامتحانات', icon: 'exam' }
+      { k: 'exams', label: 'امتحاناتي', icon: 'exam' },
+      { k: 'identity', label: 'هوية المؤسسة', icon: 'grid' },
+      { k: 'docs', label: 'وثائق الجودة', icon: 'docs' },
+      { k: 'settings', label: 'الإعدادات', icon: 'settings' },
+      { k: 'soon', label: 'بنك الأسئلة', icon: 'bank', soon: true }
     ];
-    if (r !== 'teacher') items.push({ k: 'review', label: 'المراجعة والاعتماد', icon: 'review', cnt: pend });
-    items.push(r === 'admin' ? { k: 'merge', label: 'تجميع الحزم', icon: 'merge' } : { k: 'merge', label: 'إرسال للأدمن', icon: 'send' });
-    items.push({ k: 'cloud', label: 'الأونلاين والإشعارات', icon: 'spark' });
-    items.push({ k: 'docs', label: 'وثائق الجودة', icon: 'docs' });
-    items.push({ k: 'settings', label: 'الإعدادات', icon: 'settings' });
-    return items;
   }
+  /* توقيع المطوّر */
+  M.creditHTML = function (variant) {
+    return '<div class="credit' + (variant ? ' ' + variant : '') + '"><span>Designed &amp; Developed by</span><b>Mohamed-Eldawly</b></div>';
+  };
+  M.COMING_SOON = ['bank', 'gen', 'review', 'q', 'lesson', 'merge', 'soon'];
 
   function shell(active) {
     var me = M.me();
     var items = navItems();
     var nav = items.map(function (it) {
-      return '<a href="#/' + it.k + '" class="' + (it.k === active ? 'on' : '') + '">' + I(it.icon) + '<span>' + it.label + '</span>' + (it.cnt ? '<span class="cnt">' + n(it.cnt) + '</span>' : '') + '</a>';
+      return '<a href="#/' + it.k + '" class="' + (it.k === active ? 'on' : '') + (it.soon ? ' soon' : '') + '">' + I(it.icon) + '<span>' + it.label + '</span>' + (it.soon ? '<span class="soon-b">قريباً</span>' : '') + '</a>';
     }).join('');
-    var mob = items.filter(function (it) { return ['home', 'bank', 'exams', 'cloud', 'settings'].indexOf(it.k) >= 0; }).map(function (it) {
-      return '<a href="#/' + it.k + '" class="' + (it.k === active ? 'on' : '') + '">' + I(it.icon, 22) + '<span>' + (it.k === 'cloud' ? 'الأونلاين' : it.label.split(' ')[0]) + '</span></a>';
+    var mob = items.filter(function (it) { return ['home', 'exams', 'identity', 'settings'].indexOf(it.k) >= 0; }).map(function (it) {
+      return '<a href="#/' + it.k + '" class="' + (it.k === active ? 'on' : '') + '">' + I(it.icon, 22) + '<span>' + ({ home: 'الرئيسية', exams: 'امتحاناتي', identity: 'الهوية', settings: 'الإعدادات' })[it.k] + '</span></a>';
     }).join('');
-    return '<div class="app"><aside class="side"><div class="brand"><div class="brand-mark">' + I('exam', 20) + '</div><div><b>معيار</b><span>بنك الأسئلة والامتحانات</span></div></div>' +
+    var cen = S.settings.center || {};
+    return '<div class="app"><aside class="side"><div class="brand">' + '<img class="brand-logo" src="icons/icon-192.png" alt="Exam Studio">' + '<div><b>Exam Studio</b><span>' + esc(cen.name || 'استوديو الامتحانات') + '</span></div></div>' +
       '<nav class="nav" aria-label="القائمة الرئيسية">' + nav + '</nav>' +
-      '<div class="side-foot"><div class="avatar">' + esc((me.name || '؟').trim().charAt(0)) + '</div><div style="min-width:0"><div class="bold" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(me.name || '') + '</div><div class="small muted">' + esc(M.ROLES[M.role()]) + ' · <span class="p-code">v' + esc(M.VERSION) + '</span></div></div><a href="#/cloud" id="cloud-dot" class="cloud-dot ' + ((M.cloud && M.cloud.status) || 'off') + '" title="' + esc(M.cloud && M.cloud.statusLabel ? M.cloud.statusLabel() : '') + '" aria-label="حالة الأونلاين"></a></div></aside>' +
+      M.creditHTML('cside') + '<div class="side-foot"><div class="avatar">' + esc((me.name || '؟').trim().charAt(0)) + '</div><div style="min-width:0"><div class="bold" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(me.name || '') + '</div><div class="small muted">' + esc(M.ROLES[M.role()]) + ' · <span class="p-code">v' + esc(M.VERSION) + '</span></div></div><a href="#/cloud" id="cloud-dot" class="cloud-dot ' + ((M.cloud && M.cloud.status) || 'off') + '" title="' + esc(M.cloud && M.cloud.statusLabel ? M.cloud.statusLabel() : '') + '" aria-label="حالة الأونلاين"></a></div></aside>' +
       '<div class="main" id="main"></div><nav class="mnav" aria-label="التنقل">' + mob + '</nav></div>';
   }
 
@@ -58,12 +61,19 @@
     window.__booted = true;
     if (!S.settings.setupDone) { app.innerHTML = ''; return M.views.setup(app); }
     if (M._locked) { return M.views.lock(app); }
-    var view = M.views[r.name] || M.views.home;
-    var activeKey = { q: 'bank', lesson: 'bank', exam: 'exams', gen: 'exams' }[r.name] || r.name;
-    app.innerHTML = shell(activeKey);
-    var main = document.getElementById('main');
     if (current && current.destroy) current.destroy();
     current = null;
+    /* الاستوديو بملء الشاشة بدون القائمة */
+    if (r.name === 'exam' && r.id) r.name = 'studio';
+    if (r.name === 'studio' && M.views.studio) {
+      app.innerHTML = '';
+      try { current = M.views.studio(app, r) || null; } catch (e) { console.error(e); app.innerHTML = '<div class="content"><div class="alert bad">' + I('warn') + '<div>تعذّر فتح الاستوديو: ' + esc(e.message) + '</div></div><a class="btn" href="#/exams">رجوع</a></div>'; }
+      return;
+    }
+    var view = M.COMING_SOON.indexOf(r.name) >= 0 ? M.views.soon : (M.views[r.name] || M.views.home);
+    var activeKey = M.COMING_SOON.indexOf(r.name) >= 0 ? 'soon' : r.name;
+    app.innerHTML = shell(activeKey);
+    var main = document.getElementById('main');
     try { current = view(main, r) || null; }
     catch (e) { console.error(e); main.innerHTML = '<div class="content"><div class="alert bad">' + I('warn') + '<div>حدث خطأ أثناء عرض الصفحة: ' + esc(e.message) + '</div></div></div>'; }
     window.scrollTo(0, 0);
@@ -89,7 +99,7 @@
   M.views.setup = function (app) {
     var st = { role: 'teacher' };
     app.innerHTML = '<div class="setup"><div class="card" style="padding:24px;display:flex;flex-direction:column;gap:16px">' +
-      '<div class="brand" style="padding:0;border:0"><div class="brand-mark">' + I('exam', 20) + '</div><div><b>مرحباً بك في معيار</b><span>بنك الأسئلة وتصميم الامتحانات — يعمل بدون إنترنت</span></div></div>' +
+      '<div class="brand" style="padding:0;border:0"><div class="brand-mark">' + I('exam', 20) + '</div><div><b>مرحباً بك في Exam Studio</b><span>بنك الأسئلة وتصميم الامتحانات — يعمل بدون إنترنت</span></div></div>' +
       '<div class="field"><label for="su-name">اسمك</label><input id="su-name" class="inp" placeholder="مثال: أ. محمد علي" autocomplete="name"></div>' +
       '<div class="field"><span class="lbl">دورك على هذا الجهاز</span><div class="role-pick">' +
       '<button type="button" data-r="teacher" class="on">' + I('edit', 22) + 'مدرس<small>يبني بنك أسئلة مادته ويرسله</small></button>' +
@@ -118,7 +128,7 @@
 
   M.views.lock = function (app) {
     app.innerHTML = '<div class="setup"><div class="card" style="padding:24px;display:flex;flex-direction:column;gap:14px;max-width:380px;margin:auto">' +
-      '<div class="row">' + I('lock', 22) + '<h2>معيار — ' + esc(M.me().name || '') + '</h2></div>' +
+      '<div class="row">' + I('lock', 22) + '<h2>Exam Studio — ' + esc(M.me().name || '') + '</h2></div>' +
       '<div class="field"><label for="lk">رمز الدخول</label><input id="lk" class="inp" type="password" inputmode="numeric" autocomplete="current-password"></div>' +
       '<button class="btn pri" id="lk-go">دخول</button></div></div>';
     var go = function () {
@@ -148,40 +158,34 @@
     var me = M.me(), qs = S.questions.filter(function (q) { return q.status !== 'archived'; });
     var cnt = function (st) { return qs.filter(function (q) { return q.status === st; }).length; };
     var lastB = S.settings.lastBackupAt, days = lastB ? (Date.now() - new Date(lastB)) / 864e5 : 999;
-    var subjects = S.subjects.slice().sort(function (a, b) { return String(a.name).localeCompare(b.name, 'ar'); });
-    var subjRows = subjects.map(function (s) {
-      var sq = qs.filter(function (q) { return q.subjectId === s.id; }), ap = sq.filter(function (q) { return q.status === 'approved'; }).length;
-      var target = Number(s.target) || 0, pct = target ? Math.min(100, Math.round(ap / target * 100)) : 0;
-      return '<tr><td><a href="' + M.link('bank', '', { s: s.id }) + '">' + esc(s.name) + '</a><div class="small muted">' + esc(s.className || '') + '</div></td><td>' + n(sq.length) + '</td><td>' + n(ap) + '</td>' +
-        '<td style="min-width:160px">' + (target ? '<div class="bar"><i class="' + (pct < 60 ? 'w' : '') + '" style="width:' + pct + '%"></i></div><div class="small muted">' + n(ap) + ' من ' + n(target) + '</div>' : '<span class="small muted">بدون مستهدف</span>') + '</td></tr>';
-    }).join('');
-    var recent = S.log.slice(0, 8).map(function (e) { return '<tr><td class="small muted" style="white-space:nowrap">' + n(M.fmtDate(e.at, true)) + '</td><td>' + esc(e.action) + '</td><td>' + esc(e.target) + '</td><td class="small muted">' + esc(e.by) + '</td></tr>'; }).join('');
     var hr = new Date().getHours(), greet = hr < 12 ? 'صباح الخير' : 'مساء الخير';
-    var exN = S.exams.length, lastEx = S.exams.slice().sort(function (a, b) { return a.updatedAt < b.updatedAt ? 1 : -1; })[0];
+    var cen = S.settings.center || {};
+    var exams = S.exams.slice().sort(function (a, b) { return a.updatedAt < b.updatedAt ? 1 : -1; });
+    var idDone = [!!cen.logo, !!cen.name, !!M.docFor('exam')].filter(Boolean).length;
     main.innerHTML = '<div class="content home">' +
-      '<section class="hero"><div class="hero-t"><span class="muted">' + greet + '،</span><h1>' + esc(me.name || '') + '</h1><span class="small muted">' + esc(M.ROLES[M.role()]) + (S.settings.center.name ? ' · ' + esc(S.settings.center.name) : '') + '</span></div>' +
-      '<div class="paths">' +
-      '<a class="path big bank" href="#/bank"><span class="p-ic">' + I('bank', 30) + '</span><div><b>بنك الأسئلة</b><span>أضف المواد والدروس، واكتب الأسئلة أو ولّدها من صور شرح الدرس، وراجعها واعتمدها</span></div><span class="p-meta">' + n(qs.length) + ' سؤال · ' + n(cnt('approved')) + ' معتمد</span><span class="p-go">' + I('back', 18) + '</span></a>' +
-      '<button type="button" class="path big exam" id="h-newexam"><span class="p-ic">' + I('exam', 30) + '</span><div><b>اختبار جديد</b><span>من بنك الأسئلة (تلقائياً أو باختيارك) أو يدوياً بكتابة الأسئلة مباشرة — بتنسيق احترافي ودرجات وأشكال</span></div><span class="p-meta">' + n(exN) + ' ورقة' + (lastEx ? ' · آخرها ' + esc(lastEx.title || '') : '') + '</span><span class="p-go">' + I('back', 18) + '</span></button>' +
-      '</div></section>' + (M.cloud && M.cloud.ready && !M.cloud.user ? '<div class="alert info">' + I('spark') + '<div style="flex:1">الخادم الأونلاين جاهز — سجّل الدخول لمزامنة عملك لحظياً مع باقي الأجهزة وتلقي الإشعارات الفورية.</div><a class="btn sm" href="#/cloud">تسجيل الدخول</a></div>' : '') + M.safetyBanner() + '<div id="h-folderbar"></div>' +
+      '<section class="hero2"><div class="h2-t"><span>' + greet + '،</span><h1>' + esc(me.name || '') + '</h1><p>صمّم امتحانك بنفسك: اختر نوع كل سؤال واكتبه، وشاهد الورقة تتنسّق أمامك لحظة بلحظة.</p>' +
+      '<div class="row"><button class="btn pri lg" id="h-newexam">' + I('plus') + ' امتحان جديد</button><button class="btn lg ghost-w" id="h-import">' + I('spark') + ' استيراد أسئلة مكتوبة أو مصوّرة</button></div></div>' +
+      '<div class="h2-art" aria-hidden="true"><div class="mini-paper"><i class="mp-h"></i><i class="mp-l w70"></i><i class="mp-s"></i><i class="mp-l"></i><i class="mp-l w80"></i><i class="mp-o"></i><i class="mp-s"></i><i class="mp-l w60"></i><i class="mp-f"></i></div></div></section>' +
+      M.safetyBanner() + '<div id="h-folderbar"></div>' +
       (!M.db.persistent() ? '<div class="alert bad">' + I('warn') + '<div>المتصفح لا يسمح بالحفظ الدائم في هذا الوضع (مثل التصفح الخاص) — البيانات ستضيع عند الإغلاق.</div></div>' : '') +
-      (days > 7 && S.questions.length ? '<div class="alert warn">' + I('warn') + '<div style="flex:1">' + (lastB ? 'آخر نسخة احتياطية منذ ' + n(Math.floor(days)) + ' يوماً.' : 'لم تُؤخذ نسخة احتياطية بعد.') + ' خذ نسخة الآن واحفظها خارج الجهاز.</div><button class="btn sm" id="h-backup">نسخة احتياطية</button></div>' : '') +
-      '<div class="grid4">' +
-      '<div class="card stat"><span class="small muted">إجمالي الأسئلة</span><b>' + n(qs.length) + '</b></div>' +
-      '<div class="card stat"><span class="small muted">معتمد</span><b style="color:var(--accent-d)">' + n(cnt('approved')) + '</b></div>' +
-      '<div class="card stat"><span class="small muted">قيد المراجعة</span><b style="color:var(--info)">' + n(cnt('review')) + '</b></div>' +
-      '<div class="card stat"><span class="small muted">مسودة / مُعاد</span><b style="color:var(--warn)">' + n(cnt('draft') + cnt('returned')) + '</b></div></div>' +
-      '<div class="split"><div class="body" style="flex:999 1 520px">' +
-      '<div class="card flat"><div class="card-h" style="padding:14px 16px 0"><h2 class="grow">المواد</h2><button class="btn sm" id="h-addsub">' + I('plus') + ' مادة</button></div>' +
-      (subjects.length ? '<div class="scroll-x"><table class="tbl"><thead><tr><th>المادة</th><th>الأسئلة</th><th>المعتمد</th><th>اكتمال البنك</th></tr></thead><tbody>' + subjRows + '</tbody></table></div>'
-        : '<div style="padding:16px"><div class="empty">ابدأ بإضافة مادتك، ثم الوحدات والدروس ونواتج التعلم، ثم الأسئلة.</div></div>') + '</div></div>' +
-      '<div class="aside" style="flex:1 1 380px"><div class="card flat"><div style="padding:14px 16px"><h2>آخر النشاط</h2></div>' +
-      (recent ? '<div class="scroll-x"><table class="tbl"><tbody>' + recent + '</tbody></table></div>' : '<div style="padding:0 16px 16px" class="muted small">لا يوجد نشاط بعد.</div>') + '</div></div></div></div>';
+      (days > 7 && exams.length ? '<div class="alert warn">' + I('warn') + '<div style="flex:1">' + (lastB ? 'آخر نسخة احتياطية منذ ' + n(Math.floor(days)) + ' يوماً.' : 'لم تُؤخذ نسخة احتياطية بعد.') + ' خذ نسخة الآن واحفظها خارج الجهاز.</div><button class="btn sm" id="h-backup">نسخة احتياطية</button></div>' : '') +
+      (idDone < 3 ? '<a class="id-cta" href="#/identity"><span class="ic">' + I('grid', 22) + '</span><div><b>أكمل هوية المؤسسة (' + n(idDone) + ' من ٣)</b><span>الشعار وبيانات الترويسة ووثيقة الجودة — تظهر تلقائياً في كل امتحان</span></div><span class="go">' + I('back', 18) + '</span></a>' : '') +
+      '<div class="card flat"><div class="card-h" style="padding:14px 16px 6px"><h2 class="grow">آخر الامتحانات</h2><a class="btn sm ghost" href="#/exams">الكل</a></div>' +
+      (exams.length ? '<div class="ex-grid">' + exams.slice(0, 6).map(function (e) { return M.examCard(e); }).join('') + '</div>'
+        : '<div style="padding:4px 16px 18px"><div class="empty">لا توجد امتحانات بعد — اضغط «امتحان جديد».</div></div>') + '</div></div>';
     var hb = M.qs('#h-backup', main); if (hb) hb.onclick = function () { M.backup(); };
     M.qs('#h-newexam', main).onclick = function () { M.newExamWizard(); };
+    M.qs('#h-import', main).onclick = function () { M.newExamWizard('import'); };
+    M.bindExamCards && M.bindExamCards(main);
     M.bindSafety(main);
     M.folderReconnectBar().then(function (h) { var fb = M.qs('#h-folderbar', main); if (fb && h) { fb.innerHTML = h; M.bindSafety(fb); } });
-    M.qs('#h-addsub', main).onclick = function () { M.editSubject(null); };
+  };
+
+  /* قريباً: بنك الأسئلة */
+  M.views.soon = function (main) {
+    main.innerHTML = '<div class="content"><div class="soon-page"><span class="ic">' + I('bank', 40) + '</span><span class="chip info">قريباً</span><h1>بنك الأسئلة</h1>' +
+      '<p>نطوّره في مرحلة قادمة: بنك مرتبط بالدروس ونواتج التعلم، ومراجعة واعتماد، وتوليد نماذج متكافئة تلقائياً.</p>' +
+      '<p class="muted small">بياناتك السابقة في البنك محفوظة كما هي ولن تُحذف.</p><a class="btn pri" href="#/exams">' + I('exam') + ' اذهب إلى امتحاناتي</a></div></div>';
   };
 
   /* نافذة المادة */
@@ -210,7 +214,8 @@
     var st = S.settings, cen = st.center || {}, me = M.me(), admin = M.can('center');
     var t = st.levelTargets || [30, 40, 20, 10];
     main.innerHTML = M.topbar('الإعدادات', 'الإصدار ' + n(M.VERSION)) + '<div class="content">' +
-      '<div class="row mob-only"><a class="btn" href="#/merge">' + I(M.role() === 'admin' ? 'merge' : 'send') + ' ' + (M.role() === 'admin' ? 'تجميع الحزم' : 'إرسال حزمة للأدمن') + '</a><a class="btn" href="#/docs">' + I('docs') + ' وثائق الجودة</a>' + (M.role() !== 'teacher' ? '<a class="btn" href="#/review">' + I('review') + ' المراجعة</a>' : '') + '</div>' +
+      '<div class="about-card"><img src="icons/icon-192.png" alt="" width="64" height="64"><div class="ab-t"><b>Exam Studio</b><span>استوديو الامتحانات · الإصدار <span class="p-code">' + esc(M.VERSION) + '</span></span></div>' + M.creditHTML() + '</div>' +
+      '<div class="row mob-only"><a class="btn" href="#/identity">' + I('grid') + ' هوية المؤسسة</a><a class="btn" href="#/docs">' + I('docs') + ' وثائق الجودة</a></div>' +
       '<div class="card"><div class="card-h"><h2 class="grow">الإصدار والتحديثات</h2><span class="chip ok">الإصدار <span class="p-code">' + esc(M.VERSION) + '</span></span></div>' +
       '<div class="small muted" style="margin-bottom:10px">التحديثات إجبارية: عند نشر إصدار جديد يظهر تنبيه صوتي ونافذة تحديث فوراً عند فتح التطبيق أو أثناء استخدامه (يُفحص كل ٣ دقائق)، ومع تفعيل الإشعارات يصلك إشعار حتى والتطبيق مغلق.' + (st.lastUpdateCheck ? ' آخر فحص: ' + n(M.fmtDate(st.lastUpdateCheck, true)) : '') + '</div>' +
       '<div class="row"><button class="btn" id="st-chk">' + I('download') + ' فحص التحديثات الآن</button><button class="btn" id="st-ntf">' + I('spark') + ' ' + (('Notification' in window) && Notification.permission === 'granted' ? 'الإشعارات مفعّلة — إعادة التفعيل' : 'تفعيل إشعارات التحديث') + '</button><button class="btn" id="st-snd">اختبار صوت التنبيه</button></div>' +
@@ -221,51 +226,38 @@
       '<div class="row"><label class="check"><input type="checkbox" id="snd-on"' + (st.soundOn !== false ? ' checked' : '') + '> تشغيل الأصوات</label><label class="small">مستوى الصوت <input type="range" id="snd-vol" min="0.05" max="0.8" step="0.05" value="' + (st.soundVol == null ? 0.3 : st.soundVol) + '"></label></div>' +
       '<div class="row" style="gap:6px;margin-top:8px">' + Object.keys(M.SOUND_LABELS).map(function (k) { return '<button class="btn sm" data-sndt="' + k + '">▶ ' + M.SOUND_LABELS[k] + '</button>'; }).join('') + '</div>' +
       (M.canInstall() ? '<div class="row" style="margin-top:12px"><button class="btn pri" id="st-install">' + I('download') + ' تثبيت التطبيق على هذا الجهاز</button></div>' : (M.isStandalone() ? '<div class="small muted" style="margin-top:10px">✓ التطبيق مثبت على هذا الجهاز.</div>' : '')) + '</div>' +
-      '<div class="card"><div class="card-h"><h2 class="grow">بيانات المركز (تظهر في ترويسة كل المخرجات)</h2>' + (admin ? '' : '<span class="chip">يعدّلها مدير النظام</span>') + '</div>' +
-      '<div class="row" style="align-items:flex-start">' +
-      '<div style="display:flex;flex-direction:column;gap:8px;align-items:center"><div class="p-logo' + (cen.logo ? ' has' : '') + '" id="st-logo" style="width:90px;height:90px">' + (cen.logo ? '<img src="' + cen.logo + '" alt="الشعار">' : 'لا يوجد شعار') + '</div>' +
-      (admin ? '<div class="row" style="gap:6px"><button class="btn sm" id="st-logo-up">رفع الشعار</button>' + (cen.logo ? '<button class="btn sm danger" id="st-logo-rm">إزالة</button>' : '') + '</div>' : '') + '</div>' +
-      '<div style="flex:1;min-width:260px;display:flex;flex-direction:column;gap:10px">' +
-      '<div class="field"><label for="st-cn">اسم مركز التدريب / المدرسة</label><input id="st-cn" class="inp" ' + (admin ? '' : 'disabled') + ' value="' + esc(cen.name || '') + '"></div>' +
-      '<div class="grid2"><div class="field"><label for="st-cd">المديرية / الإدارة</label><input id="st-cd" class="inp" ' + (admin ? '' : 'disabled') + ' value="' + esc(cen.directorate || '') + '"></div>' +
-      '<div class="field"><label for="st-ca">العنوان / الهاتف</label><input id="st-ca" class="inp" ' + (admin ? '' : 'disabled') + ' value="' + esc(cen.address || '') + '"></div></div>' +
-      '<div class="field"><label for="st-y">العام الدراسي</label><input id="st-y" class="inp" value="' + esc(st.year || '') + '"></div>' +
-      '</div></div></div>' +
+      '<a class="id-cta" href="#/identity"><span class="ic">' + I('grid', 22) + '</span><div><b>هوية المؤسسة</b><span>الشعارات وسطور الترويسة والعام الدراسي والتنسيق الافتراضي</span></div><span class="go">' + I('back', 18) + '</span></a>' +
       '<div class="card"><h2 style="margin-bottom:12px">المستخدم والجهاز</h2><div class="grid3">' +
       '<div class="field"><label for="st-un">الاسم</label><input id="st-un" class="inp" value="' + esc(me.name || '') + '"></div>' +
       '<div class="field"><label for="st-ur">الدور</label><select id="st-ur" class="inp">' + Object.keys(M.ROLES).map(function (k) { return '<option value="' + k + '"' + (k === me.role ? ' selected' : '') + '>' + M.ROLES[k] + '</option>'; }).join('') + '</select></div>' +
       '<div class="field"><label for="st-up">رمز الدخول (اتركه فارغاً لإلغائه)</label><input id="st-up" class="inp" type="password" inputmode="numeric" value="' + esc(me.pin || '') + '" autocomplete="new-password"></div></div>' +
       '<div class="small muted" style="margin-top:8px">معرّف الجهاز: <span class="p-code">' + esc(st.deviceId) + '</span></div></div>' +
       (M.securityCardHTML ? M.securityCardHTML() : '') +
-      '<div class="card"><h2 style="margin-bottom:12px">الافتراضيات التربوية</h2><div class="grid2">' +
-      '<div class="field"><span class="lbl">شكل الأرقام الافتراضي في الورقة</span><div class="seg" id="st-dg"><button type="button" data-v="arabic" class="' + (st.digits !== 'english' ? 'on' : '') + '">هندية ١٢٣</button><button type="button" data-v="english" class="' + (st.digits === 'english' ? 'on' : '') + '">إنجليزية 123</button></div></div>' +
-      '<div class="field"><span class="lbl">النسب المستهدفة للمستويات المعرفية (٪) — المجموع ١٠٠</span><div class="grid4">' +
-      M.LEVELS.map(function (l, i) { return '<div class="field"><label for="st-l' + i + '" class="small">' + l + '</label><input id="st-l' + i + '" class="inp" inputmode="numeric" value="' + n(t[i]) + '"></div>'; }).join('') + '</div></div></div></div>' +
+      '<div class="card"><h2 style="margin-bottom:12px">الأرقام في الورقة</h2>' +
+      '<div class="field"><span class="lbl">شكل الأرقام الافتراضي</span><div class="seg" id="st-dg"><button type="button" data-v="arabic" class="' + (st.digits !== 'english' ? 'on' : '') + '">هندية ١٢٣</button><button type="button" data-v="english" class="' + (st.digits === 'english' ? 'on' : '') + '">إنجليزية 123</button></div></div></div>' +
       '<div class="row"><button class="btn pri" id="st-save">' + I('check') + ' حفظ الإعدادات</button></div>' +
       '<div class="card"><h2 style="margin-bottom:6px">النسخ الاحتياطي</h2><p class="small muted" style="margin:0 0 12px">النسخة الاحتياطية ملف واحد فيه كل بيانات الجهاز. احفظه على فلاشة أو Drive. آخر نسخة: ' + (st.lastBackupAt ? n(M.fmtDate(st.lastBackupAt, true)) : 'لم تُؤخذ بعد') + '</p>' +
-      '<div class="row"><button class="btn" id="st-bk">' + I('download') + ' أخذ نسخة احتياطية</button><button class="btn" id="st-rs">' + I('merge') + ' استعادة نسخة</button><button class="btn" id="st-xl">' + I('download') + ' تصدير البنك كاملاً Excel</button></div></div>' +
+      '<div class="row"><button class="btn" id="st-bk">' + I('download') + ' أخذ نسخة احتياطية</button><button class="btn" id="st-rs">' + I('merge') + ' استعادة نسخة</button></div></div>' +
       '<div class="card flat"><div style="padding:14px 16px"><h2>سجل النشاط</h2><div class="small muted">سجل لا يُحذف: من فعل ماذا ومتى — دليل للمراجعة الداخلية</div></div><div class="scroll-x" style="max-height:420px;overflow:auto"><table class="tbl"><thead><tr><th>الوقت</th><th>المستخدم</th><th>الإجراء</th><th>العنصر</th><th>تفاصيل</th></tr></thead><tbody>' +
       S.log.slice(0, 300).map(function (e) { return '<tr><td class="small" style="white-space:nowrap">' + n(M.fmtDate(e.at, true)) + '</td><td>' + esc(e.by) + '<div class="small muted">' + esc(M.ROLES[e.role] || '') + '</div></td><td>' + esc(e.action) + '</td><td>' + esc(e.target) + '</td><td class="small muted">' + esc(e.detail) + '</td></tr>'; }).join('') +
       '</tbody></table></div></div>' +
+      '<details class="card"><summary class="bold" style="cursor:pointer">متقدم: المزامنة الأونلاين وحزم النقل</summary><div class="row" style="margin-top:10px"><a class="btn" href="#/cloud">' + I('spark') + ' الأونلاين والإشعارات</a></div></details>' +
       '<div class="card"><h2 style="margin-bottom:6px;color:var(--bad)">منطقة الخطر</h2><p class="small muted" style="margin:0 0 12px">مسح كل البيانات من هذا الجهاز. خذ نسخة احتياطية أولاً.</p><button class="btn danger" id="st-wipe">' + I('trash') + ' مسح كل البيانات</button></div>' +
       '</div>';
     var digits = st.digits || 'arabic';
     M.qsa('#st-dg button', main).forEach(function (b) { b.onclick = function () { digits = b.dataset.v; M.qsa('#st-dg button', main).forEach(function (x) { x.classList.toggle('on', x === b); }); }; });
-    if (admin) {
+    if (admin && M.qs('#st-logo-up', main)) {
       M.qs('#st-logo-up', main).onclick = function () {
         M.pickFile('image/*').then(function (f) { if (!f[0]) return; return M.readFile(f[0], 'dataurl').then(function (d) { return M.shrinkImage(d, 400); }).then(function (d) { return M.setSetting('center', Object.assign({}, S.settings.center, { logo: d })); }).then(function () { M.render(); }); });
       };
       var rm = M.qs('#st-logo-rm', main); if (rm) rm.onclick = function () { M.setSetting('center', Object.assign({}, S.settings.center, { logo: '' })).then(M.render); };
     }
     M.qs('#st-save', main).onclick = function () {
-      var lv = [0, 1, 2, 3].map(function (i) { return Number(M.toWestern(M.qs('#st-l' + i, main).value)) || 0; });
-      if (lv.reduce(function (a, b) { return a + b; }, 0) !== 100) { M.toast('مجموع النسب يجب أن يساوي ١٠٠', 'bad'); return; }
       var pin = M.toWestern(M.qs('#st-up', main).value.trim());
       if (pin && !/^\d{4,}$/.test(pin)) { M.toast('رمز الدخول أرقام فقط (٤ على الأقل)', 'bad'); return; }
       var name = M.qs('#st-un', main).value.trim(); if (!name) { M.toast('الاسم مطلوب', 'bad'); return; }
       var newRole = M.qs('#st-ur', main).value;
-      var jobs = [M.setSetting('user', { name: name, role: newRole, pin: pin }), M.setSetting('digits', digits), M.setSetting('levelTargets', lv), M.setSetting('year', M.qs('#st-y', main).value.trim())];
-      if (admin) jobs.push(M.setSetting('center', Object.assign({}, S.settings.center, { name: M.qs('#st-cn', main).value.trim(), directorate: M.qs('#st-cd', main).value.trim(), address: M.qs('#st-ca', main).value.trim() })));
+      var jobs = [M.setSetting('user', { name: name, role: newRole, pin: pin }), M.setSetting('digits', digits)];
       if (newRole !== me.role) M.log('تغيير الدور', name, M.ROLES[me.role] + ' ← ' + M.ROLES[newRole]);
       Promise.all(jobs).then(function () { M.toast('تم حفظ الإعدادات', 'ok'); M.render(); });
     };
@@ -284,7 +276,7 @@
     });
     M.qs('#st-bk', main).onclick = function () { M.backup().then(function () { M.toast('تم تنزيل النسخة الاحتياطية', 'ok'); }); };
     M.qs('#st-rs', main).onclick = M.restoreFlow;
-    M.qs('#st-xl', main).onclick = function () { M.exportBankExcel(S.questions.filter(function (q) { return q.status !== 'archived'; }), 'بنك-الأسئلة-كاملاً'); };
+    var xl = M.qs('#st-xl', main); if (xl) xl.onclick = function () { M.exportBankExcel(S.questions.filter(function (q) { return q.status !== 'archived'; }), 'بنك-الأسئلة-كاملاً'); };
     M.qs('#st-wipe', main).onclick = function () {
       M.confirm('مسح كل البيانات', 'سيتم حذف كل المواد والأسئلة والامتحانات والوثائق من هذا الجهاز نهائياً.', 'مسح نهائي', true).then(function (ok) {
         if (!ok) return;

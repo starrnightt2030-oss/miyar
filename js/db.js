@@ -28,7 +28,7 @@
       req.onblocked = function () {
         window.__bootBlocked = true;
         var a = document.getElementById('app');
-        if (a) a.innerHTML = '<div style="max-width:460px;margin:60px auto;padding:24px;border-radius:16px;background:#fff;border:1px solid #e3e6ee;font-family:sans-serif;line-height:1.8;text-align:center"><b style="font-size:18px">نسخة قديمة من «معيار» مفتوحة</b><p>أغلق أي تبويب أو نافذة أخرى للتطبيق (أو التطبيق المثبت)، وسيفتح هنا تلقائياً.</p></div>';
+        if (a) a.innerHTML = '<div style="max-width:460px;margin:60px auto;padding:24px;border-radius:16px;background:#fff;border:1px solid #e3e6ee;font-family:sans-serif;line-height:1.8;text-align:center"><b style="font-size:18px">نسخة قديمة من Exam Studio مفتوحة</b><p>أغلق أي تبويب أو نافذة أخرى للتطبيق (أو التطبيق المثبت)، وسيفتح هنا تلقائياً.</p></div>';
       };
     });
     return dbp;

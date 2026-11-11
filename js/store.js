@@ -1,4 +1,4 @@
-/* الحالة والقواعد — معيار */
+/* الحالة والقواعد — Exam Studio */
 (function (M) {
   'use strict';
 

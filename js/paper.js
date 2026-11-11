@@ -63,6 +63,12 @@
     var doc = e.docId ? M.byId('docs', e.docId) : M.docFor('exam');
     var subject = M.byId('subjects', e.subjectId);
     var logo = cen.logo ? '<div class="p-logo has"><img src="' + cen.logo + '" alt="شعار المركز"></div>' : '<div class="p-logo">شعار<br>المركز</div>';
+    var lines = (cen.lines || []).filter(function (x) { return String(x || '').trim(); });
+    var nameBlock = lines.length ? '<div class="p-lines-id">' + lines.map(function (l, i) { return i === lines.length - 1 ? '<b>' + c.T(l) + '</b>' : '<span>' + c.T(l) + '</span>'; }).join('') + '</div>'
+      : '<div><b>' + (c.T(cen.name) || '[اسم المؤسسة]') + '</b>' + (cen.directorate ? '<span>' + c.T(cen.directorate) + '</span>' : '') + (cen.address ? '<span>' + c.T(cen.address) + '</span>' : '') + '</div>';
+    var showDoc = e.showDoc !== false && !!doc;
+    var c3 = showDoc ? null : (cen.logo2 ? '<div class="c3 logo"><div class="p-logo has big"><img src="' + cen.logo2 + '" alt=""></div></div>' : (cen.logoSide === 'left' && cen.logo ? '<div class="c3 logo"><div class="p-logo has big"><img src="' + cen.logo + '" alt=""></div></div>' : '<div class="c3 logo"></div>'));
+    var c1logo = cen.logoSide === 'left' && !showDoc ? '' : logo;
     var docRows = doc
       ? '<span class="k">اسم الوثيقة</span><span>' + M.esc(doc.name) + '</span>' +
         '<span class="k">كود الوثيقة</span><span><span class="p-code">' + M.esc(doc.code) + '</span></span>' +
@@ -70,13 +76,12 @@
         '<span class="k">تاريخ الإصدار</span><span>' + c.num(M.fmtDate(doc.issueDate)) + '</span>' +
         '<span class="k">الصفحة</span><span>' + pageNoPh + '</span>'
       : '<span class="k">اسم الوثيقة</span><span>—</span><span class="k">كود الوثيقة</span><span>—</span><span class="k">رقم الإصدار</span><span>—</span><span class="k">الصفحة</span><span>' + pageNoPh + '</span>';
-    return '<div class="pblock p-head">' +
-      '<div class="c1">' + logo + '<div><b>' + (c.T(cen.name) || '[اسم مركز التدريب]') + '</b>' +
-      (cen.directorate ? '<span>' + c.T(cen.directorate) + '</span>' : '') + (cen.address ? '<span>' + c.T(cen.address) + '</span>' : '') + '</div></div>' +
+    return '<div class="pblock p-head' + (showDoc ? '' : ' nodoc') + '">' +
+      '<div class="c1">' + c1logo + nameBlock + '</div>' +
       '<div class="c2"><span class="t1">' + c.T(e.title || 'امتحان') + (e.model ? ' — نموذج (' + c.T(e.model) + ')' : '') + '</span>' +
       '<span class="t2">مادة ' + c.T(M.examSubject(e)) + '</span>' +
       '<span class="t3">العام الدراسي ' + c.T(e.year || M.S.settings.year) + '</span></div>' +
-      '<div class="p-doc">' + docRows + '</div></div>';
+      (showDoc ? '<div class="p-doc">' + docRows + '</div>' : c3) + '</div>';
   }
 
   function infoHTML(c, pagesPh) {
@@ -171,7 +176,13 @@
   }
   M._fig = fig;
   /* موضع الشكل: تحت السؤال (افتراضي) · فوقه · بجانبه يساراً أو يميناً · بعد مساحة الإجابة */
+  function solLines(q) {
+    var k = Math.max(0, Math.min(30, Number(q.solLines) || 0)); if (!k) return '';
+    var li = ''; for (var i = 0; i < k; i++) li += '<i></i>';
+    return '<div class="p-lines p-sol">' + li + '</div>';
+  }
   function place(q, st, rest) {
+    rest = rest + solLines(q);
     if (!q.figure) return st + rest;
     var pos = q.figurePos || 'below';
     if (pos === 'above') return fig(q) + st + rest;
@@ -193,7 +204,7 @@
       h += '<div class="p-tf">';
       its.forEach(function (it, k) {
         var q = M.itemQ(e, it); if (!q) return;
-        h += '<span>' + c.num(from + k + 1) + '</span><span>' + place(q, c.rich(q.text), '') + '</span><span>(&nbsp;&nbsp;&nbsp;&nbsp;)</span>';
+        h += '<span data-q="' + q.id + '">' + c.num(from + k + 1) + '</span><span data-q="' + q.id + '">' + place(q, c.rich(q.text), '') + '</span><span data-q="' + q.id + '">(&nbsp;&nbsp;&nbsp;&nbsp;)</span>';
       });
       return h + '</div>';
     }
@@ -215,9 +226,10 @@
         var q = M.itemQ(e, it); if (!q) return;
         var order = M.mcqOrder(e, sec, q);
         var opts = order.map(function (i) { return q.options[i]; });
-        var oh = '<div class="p-opts ' + (sec.layout === 'two' || q.figurePos === 'side' || q.figurePos === 'side-start' ? (optCols(opts) === 'c1' ? 'c1' : 'c2') : optCols(opts)) + '">';
+        var oc = sec.optCols && sec.optCols !== 'auto' ? 'c' + sec.optCols : (sec.layout === 'two' || q.figurePos === 'side' || q.figurePos === 'side-start' ? (optCols(opts) === 'c1' ? 'c1' : 'c2') : optCols(opts));
+        var oh = '<div class="p-opts ' + oc + '">';
         opts.forEach(function (o, j) { oh += '<span><i class="ring"></i>' + c.L[j] + ') ' + c.rich(o) + '</span>'; });
-        h += '<div class="p-item">' + place(q, '<div class="st">' + (sec.items.length === 1 ? '' : itemNo(c, from + k + 1)) + '<span>' + c.rich(q.text) + '</span></div>', oh + '</div>') + '</div>';
+        h += '<div class="p-item" data-q="' + q.id + '">' + place(q, '<div class="st">' + (sec.items.length === 1 ? '' : itemNo(c, from + k + 1)) + '<span>' + c.rich(q.text) + '</span></div>', oh + '</div>') + '</div>';
       });
       return h + '</div>';
     }
@@ -230,21 +242,21 @@
       var q = M.itemQ(e, it); if (!q) return;
       var no = sec.items.length === 1 ? '' : itemNo(c, from + k + 1);
       if (sec.type === 'complete') {
-        h += '<div class="p-item">' + place(q, '<div class="st">' + no + '<span>' + c.rich(q.text) + '</span></div>', '') + '</div>';
+        h += '<div class="p-item" data-q="' + q.id + '">' + place(q, '<div class="st">' + no + '<span>' + c.rich(q.text) + '</span></div>', '') + '</div>';
       } else if (sec.type === 'term') {
-        h += '<div class="p-item">' + place(q, '<div class="st p-term">' + no + '<span>' + c.rich(q.text) + '</span><span class="tb">(…………………………)</span></div>', '') + '</div>';
+        h += '<div class="p-item" data-q="' + q.id + '">' + place(q, '<div class="st p-term">' + no + '<span>' + c.rich(q.text) + '</span><span class="tb">(…………………………)</span></div>', '') + '</div>';
       } else if (sec.type === 'image') {
-        h += '<div class="p-item"><div class="st">' + no + '<span>' + c.rich(q.text) + '</span></div><div class="p-img">' +
+        h += '<div class="p-item" data-q="' + q.id + '"><div class="st">' + no + '<span>' + c.rich(q.text) + '</span></div><div class="p-img">' +
           (q.image ? '<img src="' + q.image + '" alt="">' : '') + '<div class="lbls">' +
           q.labels.map(function (l) { return '<span>' + c.T(l.n) + '</span><span>…………………………</span>'; }).join('') + '</div></div></div>';
       } else if (sec.type === 'draw') {
-        h += '<div class="p-item">' + place(q, '<div class="st">' + no + '<span>' + c.rich(q.text) + '</span></div>',
+        h += '<div class="p-item" data-q="' + q.id + '">' + place(q, '<div class="st">' + no + '<span>' + c.rich(q.text) + '</span></div>',
           '<div class="p-draw' + (q.drawGrid !== false ? ' grid' : '') + '" style="height:' + (Number(q.drawHeight) || 140) + 'px"></div>') + '</div>';
       } else {
         var lines = Math.max(0, Number(q.lines) || 0), li = '';
         for (var i = 0; i < lines; i++) li += '<i></i>';
         var pre = sec.type === 'reason' && !/^\s*علل/.test(q.text) && !c.en ? '' : '';
-        h += '<div class="p-item">' + place(q, '<div class="st">' + no + '<span>' + pre + c.rich(q.text) + '</span></div>', lines ? '<div class="p-lines">' + li + '</div>' : '') + '</div>';
+        h += '<div class="p-item" data-q="' + q.id + '">' + place(q, '<div class="st">' + no + '<span>' + pre + c.rich(q.text) + '</span></div>', lines ? '<div class="p-lines">' + li + '</div>' : '') + '</div>';
       }
     });
     return h;
@@ -252,7 +264,8 @@
 
   function sectionHTML(c, sec, idx, from, to, cont) {
     var head = (from === 0 || cont) ? secHeadHTML(c, sec, idx, cont && from > 0) : '';
-    return '<div class="pblock p-sec" data-sec="' + idx + '">' + head + itemsHTML(c, sec, from, to) + '</div>';
+    var sep = sec.sep || c.exam.itemSep || 'space';
+    return '<div class="pblock p-sec sep-' + sep + '" data-sec="' + idx + '">' + head + itemsHTML(c, sec, from, to) + '</div>';
   }
 
   function footHTML(c) {

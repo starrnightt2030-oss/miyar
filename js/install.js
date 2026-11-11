@@ -15,7 +15,7 @@
     bip = null; closeSheet();
     try { localStorage.setItem('miyar-installed', '1'); } catch (x) { /* */ }
     M.sound && M.sound('done');
-    M.toast && M.toast('تم تثبيت معيار — افتحه من أيقونته على الشاشة الرئيسية', 'ok');
+    M.toast && M.toast('تم تثبيت Exam Studio — افتحه من أيقونته على الشاشة الرئيسية', 'ok');
     M.log && M.log('تثبيت التطبيق', navigator.userAgent.slice(0, 60));
   });
 
@@ -33,7 +33,7 @@
     var el = document.createElement('div');
     el.id = 'install-sheet'; el.className = 'install-sheet'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'تثبيت التطبيق');
     el.innerHTML = '<div class="install-card"><div class="row" style="flex-wrap:nowrap;gap:14px"><img src="icons/icon-192.png" alt="" width="60" height="60" style="border-radius:14px;flex:none">' +
-      '<div style="flex:1;min-width:0"><b style="font-size:17px">ثبّت «معيار» على جهازك</b><div class="small muted">يفتح كتطبيق مستقل بأيقونة على الشاشة، ويعمل بدون إنترنت، وتصلك الإشعارات الفورية، وبياناتك محمية من المسح.</div></div></div>' +
+      '<div style="flex:1;min-width:0"><b style="font-size:17px">ثبّت Exam Studio على جهازك</b><div class="small muted">يفتح كتطبيق مستقل بأيقونة على الشاشة، ويعمل بدون إنترنت، وتصلك الإشعارات الفورية، وبياناتك محمية من المسح.</div></div></div>' +
       (ios ? '<ol class="small" style="margin:10px 0 0;padding-inline-start:20px;line-height:1.9"><li>اضغط زر <b>المشاركة</b> <span aria-hidden="true">⬆︎</span> أسفل Safari.</li><li>اختر <b>«إضافة إلى الشاشة الرئيسية»</b>.</li><li>اضغط <b>«إضافة»</b>.</li></ol>' : '') +
       '<div class="row" style="margin-top:12px">' + (ios ? '' : '<button class="btn pri" id="ins-go" style="flex:1">' + I('download') + ' تثبيت الآن</button>') + '<button class="btn" id="ins-later"' + (ios ? ' style="flex:1"' : '') + '>' + (ios ? 'فهمت' : 'لاحقاً') + '</button></div></div>';
     document.body.appendChild(el);

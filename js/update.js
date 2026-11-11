@@ -37,8 +37,8 @@
   function notify(remote) {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     var opts = { body: 'الإصدار ' + remote.version + ' — افتح التطبيق للتحديث الآن', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: 'miyar-update', requireInteraction: true, vibrate: [250, 120, 250] };
-    if (reg && reg.showNotification) reg.showNotification('تحديث جديد لمعيار', opts).catch(function () {});
-    else try { new Notification('تحديث جديد لمعيار', opts); } catch (e) { /* */ }
+    if (reg && reg.showNotification) reg.showNotification('تحديث جديد لـ Exam Studio', opts).catch(function () {});
+    else try { new Notification('تحديث جديد لـ Exam Studio', opts); } catch (e) { /* */ }
   }
 
   M.checkUpdate = function (manual) {
@@ -110,7 +110,7 @@
         }).catch(function () { return false; }) : Promise.resolve(false);
         return j.then(function (bg) {
           M.setSetting('notifyEnabled', true);
-          r.showNotification('معيار', { body: 'تم تفعيل إشعارات التحديث' + (bg ? ' — مع الفحص في الخلفية' : ''), icon: 'icons/icon-192.png', tag: 'miyar-test' });
+          r.showNotification('Exam Studio', { body: 'تم تفعيل إشعارات التحديث' + (bg ? ' — مع الفحص في الخلفية' : ''), icon: 'icons/icon-192.png', tag: 'miyar-test' });
           M.toast('تم تفعيل الإشعارات', 'ok');
           return true;
         });

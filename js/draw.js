@@ -2,7 +2,7 @@
 (function (M) {
   'use strict';
   var W = 720, H = 440;
-  var COLORS = ['#111827', '#1E3A8A', '#B91C1C', '#0E7C6B'];
+  var COLORS = ['#111827', '#1E3A8A', '#B91C1C', '#1D4ED8'];
   var TOOLS = [
     ['pen', 'قلم حر'], ['line', 'قطعة مستقيمة'], ['arrow', 'سهم / شعاع'], ['rect', 'مستطيل'], ['circle', 'دائرة'], ['poly', 'مضلع / مثلث'], ['point', 'نقطة بحرف'], ['text', 'نص'], ['angle', 'قوس زاوية']
   ];

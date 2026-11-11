@@ -225,7 +225,7 @@
       exam.sections.forEach(function (sec, i) { kids = kids.concat(sectionBlocks(k, exam, sec, i, imgs)); });
       kids.push(k.para(exam.lang === 'en' ? 'End of questions' : 'انتهت الأسئلة', { bold: true, center: true, before: 200 }));
       if (exam.showSign !== false) kids.push(k.table([[k.cell('توقيع المصحح', { w: 3488, center: true }), k.cell('توقيع المراجع', { w: 3489, center: true }), k.cell('رئيس اللجنة', { w: 3489, center: true })]], [3488, 3489, 3489], { noBorder: true }));
-      var doc = new k.d.Document({ creator: 'معيار', title: exam.title || 'امتحان', styles: { default: { document: { run: { font: FONT, rightToLeft: true } } } },
+      var doc = new k.d.Document({ creator: 'Exam Studio — Mohamed-Eldawly', title: exam.title || 'امتحان', styles: { default: { document: { run: { font: FONT, rightToLeft: true } } } },
         sections: [{ properties: pageProps(), footers: { default: footer(k, exam) }, children: kids }] });
       M.log('تصدير Word', exam.title + (exam.model ? ' — نموذج ' + exam.model : ''));
       return save(doc, (exam.title || 'امتحان') + (exam.model ? '-نموذج-' + exam.model : '') + '.docx');
@@ -251,7 +251,7 @@
       });
       if (rows.length) kids.push(k.table(rows, [700, 8266, 1500]));
     });
-    var doc = new k.d.Document({ creator: 'معيار', sections: [{ properties: pageProps(), footers: { default: footer(k, exam) }, children: kids }] });
+    var doc = new k.d.Document({ creator: 'Exam Studio — Mohamed-Eldawly', sections: [{ properties: pageProps(), footers: { default: footer(k, exam) }, children: kids }] });
     return save(doc, 'مفتاح-الإجابة-' + (exam.title || '') + (exam.model ? '-' + exam.model : '') + '.docx');
   };
 
@@ -271,7 +271,7 @@
       .concat(dd.levelGrades.map(function (g, i) { return k.cell(g + ' (' + Math.round(g / dd.total * 100) + '% من ' + dd.targets[i] + '%)', { w: widths[3 + i], size: 9, center: true, bold: true }); }))
       .concat([k.cell(String(M.examTotal(exam)), { w: 1000, center: true, bold: true })]));
     kids.push(k.table(rows, widths));
-    var doc = new k.d.Document({ creator: 'معيار', sections: [{ properties: { page: { size: { width: 16838, height: 11906, orientation: k.d.PageOrientation.LANDSCAPE }, margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, footers: { default: footer(k, exam) }, children: kids }] });
+    var doc = new k.d.Document({ creator: 'Exam Studio — Mohamed-Eldawly', sections: [{ properties: { page: { size: { width: 16838, height: 11906, orientation: k.d.PageOrientation.LANDSCAPE }, margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, footers: { default: footer(k, exam) }, children: kids }] });
     return save(doc, 'جدول-المواصفات-' + (exam.title || '') + '.docx');
   };
 
@@ -294,7 +294,7 @@
       });
       kids.push(k.table(rows, [500, 1300, 4766, 2400, 900, 600]));
     });
-    var doc = new k.d.Document({ creator: 'معيار', sections: [{ properties: pageProps(), children: kids }] });
+    var doc = new k.d.Document({ creator: 'Exam Studio — Mohamed-Eldawly', sections: [{ properties: pageProps(), children: kids }] });
     M.log('تصدير Word', title || 'بنك الأسئلة', 'أسئلة: ' + questions.length);
     return save(doc, (title || 'بنك-الأسئلة') + '-' + M.today() + '.docx');
   };

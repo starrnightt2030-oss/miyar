@@ -319,6 +319,11 @@
       return wait(ms).then(function () { return withRetry(fn, tries - 1); });
     });
   }
+  /* طلب خام بمخطط اختياري (للاستيراد): يعيد { data, usage } */
+  M.aiRaw = function (route, model, spec) {
+    return withRetry(function () { return schemaFallback(route, function (lg) { return rawCall(route, model, spec, lg); }); }, 3)
+      .then(function (r) { return { data: parseObj(r.text), usage: r.usage }; });
+  };
   M.aiCall = function (route, model, spec) {
     return withRetry(function () { return aiCall0(route, model, spec); }, 3);
   };

@@ -71,7 +71,7 @@
       C.user = r.data.user;
       M.log('إنشاء حساب أونلاين', email);
       return afterLogin().then(function () {
-        if (C.profile && !C.profile.approved) C.invoke('notify', { kind: 'signup', toRoles: ['admin'], title: 'طلب حساب جديد في معيار', body: name + ' (' + email + ') ينتظر موافقتك', url: './index.html#/cloud' }).catch(function () {});
+        if (C.profile && !C.profile.approved) C.invoke('notify', { kind: 'signup', toRoles: ['admin'], title: 'طلب حساب جديد في Exam Studio', body: name + ' (' + email + ') ينتظر موافقتك', url: './index.html#/cloud' }).catch(function () {});
         return 'ok';
       });
     });
@@ -432,7 +432,7 @@
           C.client.from('profiles').update({ approved: approve }).eq('id', u.id).then(function (res) {
             if (res.error) return M.toast(res.error.message, 'bad');
             M.log(approve ? 'موافقة على حساب' : 'إيقاف حساب', u.name + ' ' + u.email);
-            if (approve) C.notify({ kind: 'account', toUsers: [u.id], title: 'تمت الموافقة على حسابك في معيار', body: 'افتح التطبيق لبدء المزامنة', url: './index.html#/cloud' });
+            if (approve) C.notify({ kind: 'account', toUsers: [u.id], title: 'تمت الموافقة على حسابك في Exam Studio', body: 'افتح التطبيق لبدء المزامنة', url: './index.html#/cloud' });
             M.render();
           });
         };

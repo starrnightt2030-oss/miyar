@@ -65,9 +65,9 @@
     return h.queryPermission({ mode: 'readwrite' }).then(function (p) {
       if (p !== 'granted') return false;
       return M.buildPack('backup').then(function (txt) {
-        var jobs = [writeFile(h, 'معيار-آخر-نسخة.miyar', txt)];
+        var jobs = [writeFile(h, 'ExamStudio-آخر-نسخة.miyar', txt)];
         var today = M.today();
-        if (force || S.settings.lastFolderDaily !== today) { jobs.push(writeFile(h, 'معيار-' + today + '.miyar', txt)); M.setSetting('lastFolderDaily', today); }
+        if (force || S.settings.lastFolderDaily !== today) { jobs.push(writeFile(h, 'ExamStudio-' + today + '.miyar', txt)); M.setSetting('lastFolderDaily', today); }
         return Promise.all(jobs).then(function () { M.setSetting('lastFolderSave', M.now()); return true; });
       });
     }).catch(function (e) { console.warn('folder save', e); return false; });
@@ -82,7 +82,7 @@
   };
   M.phoneBackup = function () {
     return M.buildPack('backup').then(function (txt) {
-      var name = 'معيار-نسخة-' + M.today() + '.miyar';
+      var name = 'ExamStudio-نسخة-' + M.today() + '.miyar';
       M.download(name, new Blob([txt], { type: 'application/octet-stream' }));
       M.setSetting('lastPhoneBackup', M.today()); M.setSetting('lastBackupAt', M.now());
       M.log('نسخة يومية', name);
@@ -149,7 +149,7 @@
       h += '<div class="row"><b>مجلد الحفظ التلقائي:</b>' + (fh ? '<span class="chip ' + (folderSt === 'granted' ? 'ok' : 'warn') + '">' + esc(fh.name) + (folderSt === 'granted' ? ' — يعمل' : ' — يحتاج تفعيل') + '</span>' : '<span class="chip">غير مربوط</span>') +
         (S.settings.lastFolderSave ? '<span class="small muted">آخر حفظ: ' + n(M.fmtDate(S.settings.lastFolderSave, true)) + '</span>' : '') + '<span class="grow" style="flex:1"></span>' +
         (fh && folderSt !== 'granted' ? '<button class="btn sm" data-safety="reconnect">تفعيل</button>' : '') + '<button class="btn sm" data-safety="folder">' + (fh ? 'تغيير المجلد' : 'اختيار المجلد') + '</button></div>' +
-        '<div class="small muted">يُكتب بعد كل تعديل ملف «معيار-آخر-نسخة.miyar»، ومعه نسخة بتاريخ كل يوم. ضع المجلد داخل OneDrive أو Google Drive ليتزامن تلقائياً.</div>';
+        '<div class="small muted">يُكتب بعد كل تعديل ملف «Exam Studio-آخر-نسخة.miyar»، ومعه نسخة بتاريخ كل يوم. ضع المجلد داخل OneDrive أو Google Drive ليتزامن تلقائياً.</div>';
     } else {
       h += '<label class="check"><input type="checkbox" id="sf-auto"' + (S.settings.autoPhoneBackup !== false ? ' checked' : '') + '> نسخة يومية تلقائية إلى مجلد التنزيلات (Download) في أول تعديل كل يوم</label>' +
         '<div class="row"><span class="small muted">آخر نسخة على الجهاز: ' + (S.settings.lastPhoneBackup ? n(S.settings.lastPhoneBackup) : 'لم تُحفظ بعد') + '</span><button class="btn sm" data-safety="phone">حفظ نسخة الآن</button></div>';
@@ -165,7 +165,7 @@
     M.bindSafety(root);
     var a = M.qs('#sf-auto', root); if (a) a.onchange = function () { M.setSetting('autoPhoneBackup', a.checked); };
     var sn = M.qs('#sf-snap', root); if (sn) sn.onclick = function () { M.snapshot('يدوية').then(function () { M.toast('تم أخذ نسخة داخلية', 'ok'); M.render(); }); };
-    M.qsa('[data-snapdl]', root).forEach(function (b) { b.onclick = function () { var s = snaps.find(function (x) { return x.id === b.dataset.snapdl; }); M.download('معيار-نسخة-' + s.at.slice(0, 10) + '.miyar', new Blob([s.text])); }; });
+    M.qsa('[data-snapdl]', root).forEach(function (b) { b.onclick = function () { var s = snaps.find(function (x) { return x.id === b.dataset.snapdl; }); M.download('ExamStudio-نسخة-' + s.at.slice(0, 10) + '.miyar', new Blob([s.text])); }; });
     M.qsa('[data-snaprs]', root).forEach(function (b) {
       b.onclick = function () {
         M.confirm('استرجاع نسخة داخلية', 'سيتم استبدال البيانات الحالية بهذه النسخة (تُحفظ نسخة من الحالي أولاً).', 'استرجاع', true).then(function (ok) {

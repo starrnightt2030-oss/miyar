@@ -1,0 +1,25 @@
+plugins { id 'com.android.application' }
+
+android {
+  namespace 'io.github.eldawly.examstudio'
+  compileSdk 34
+  defaultConfig {
+    applicationId 'io.github.eldawly.examstudio'
+    minSdk 24
+    targetSdk 34
+    versionCode((System.getenv('VCODE') ?: '1') as Integer)
+    versionName(System.getenv('VNAME') ?: '1.0')
+  }
+  signingConfigs {
+    release {
+      storeFile file(System.getenv('KS_FILE') ?: '../examstudio.jks')
+      storePassword System.getenv('KS_PASS')
+      keyAlias 'examstudio'
+      keyPassword System.getenv('KS_PASS')
+    }
+  }
+  buildTypes {
+    release { minifyEnabled false; signingConfig signingConfigs.release }
+  }
+  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}

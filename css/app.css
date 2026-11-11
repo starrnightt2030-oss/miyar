@@ -603,3 +603,5 @@ body{background:radial-gradient(1200px 500px at 100% -10%,#E7F2EF 0,transparent 
 .sd-fnt #sd-fsv{min-width:26px;text-align:center;font-size:12.5px;font-weight:700;color:var(--accent-d)}
 .sd-fnt #sd-bold.on{background:var(--accent);color:#fff}
 @media (max-width:560px){.sd-ptools{overflow-x:auto;scrollbar-width:none}.sd-ptools::-webkit-scrollbar{display:none}.sd-ptools .sd-pc{display:none}.sd-ptools #sd-zf{display:none}.sd-fnt{margin-inline-end:2px}.sd-fnt .btn{min-width:28px;padding:0 4px}}
+.apk-dl{margin-top:10px;width:100%;justify-content:center;background:linear-gradient(180deg,#22C55E,#16A34A);color:#fff;border:0;font-weight:700}
+.apk-dl .apk-ic{font-size:11px}

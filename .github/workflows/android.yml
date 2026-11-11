@@ -1,0 +1,59 @@
+# بناء تطبيق الأندرويد (APK) ونشره في Releases تلقائياً عند تعديل مجلد android
+name: Android APK
+on:
+  push:
+    branches: [main]
+    paths: ['android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: مفتاح التوقيع (من Secrets لو موجود، وإلا مفتاح مؤقت)
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_SECRET: ${{ secrets.ANDROID_KS_PASS }}
+        run: |
+          if [ -n "$KS_B64" ] && [ -n "$KS_SECRET" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/ks.jks"
+            echo "KS_PASS=$KS_SECRET" >> "$GITHUB_ENV"
+          else
+            echo "::warning::لا يوجد مفتاح توقيع في Secrets — سيُستخدم مفتاح مؤقت"
+            P=$(openssl rand -hex 16); echo "::add-mask::$P"
+            keytool -genkeypair -keystore "$RUNNER_TEMP/ks.jks" -alias examstudio -keyalg RSA -keysize 2048 -validity 36500 -storepass "$P" -keypass "$P" -dname "CN=Mohamed-Eldawly, O=Exam Studio, C=EG"
+            echo "KS_PASS=$P" >> "$GITHUB_ENV"
+          fi
+          echo "KS_FILE=$RUNNER_TEMP/ks.jks" >> "$GITHUB_ENV"
+      - name: بناء APK
+        working-directory: android
+        env:
+          VCODE: ${{ github.run_number }}
+          VNAME: 1.0.${{ github.run_number }}
+        run: gradle assembleRelease --no-daemon --stacktrace
+      - name: تجهيز الملف
+        run: cp android/app/build/outputs/apk/release/app-release.apk ExamStudio.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ExamStudio-apk
+          path: ExamStudio.apk
+      - name: نشر في Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-v1.0.${{ github.run_number }}
+          name: Exam Studio — Android 1.0.${{ github.run_number }}
+          body: |
+            تطبيق Exam Studio للأندرويد.
+            حمّل ExamStudio.apk وثبّته (اسمح بالتثبيت من مصادر غير معروفة).
+            التطبيق يتحدّث تلقائياً مع نسخة GitHub — مش محتاج تنزّل APK جديد مع كل تحديث.
+          files: ExamStudio.apk
+          make_latest: true

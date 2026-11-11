@@ -10,7 +10,7 @@
   function unb64(s) { var r = atob(s), a = new Uint8Array(r.length); for (var i = 0; i < r.length; i++) a[i] = r.charCodeAt(i); return a; }
 
   M.bio = {
-    supported: function () { return !!(window.PublicKeyCredential && navigator.credentials && window.isSecureContext); },
+    supported: function () { return !window.ExamStudioAndroid && !!(window.PublicKeyCredential && navigator.credentials && window.isSecureContext); },
     available: function () {
       if (!M.bio.supported() || !PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) return Promise.resolve(false);
       return PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().catch(function () { return false; });

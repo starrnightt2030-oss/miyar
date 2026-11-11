@@ -215,6 +215,7 @@
     var t = st.levelTargets || [30, 40, 20, 10];
     main.innerHTML = M.topbar('الإعدادات', 'الإصدار ' + n(M.VERSION)) + '<div class="content">' +
       '<div class="about-card"><img src="icons/icon-192.png" alt="" width="64" height="64"><div class="ab-t"><b>Exam Studio</b><span>استوديو الامتحانات · الإصدار <span class="p-code">' + esc(M.VERSION) + '</span></span></div>' + M.creditHTML() + '</div>' +
+      (M.isAndroidApp ? '' : '<a class="btn apk-dl" href="https://github.com/starrnightt2030-oss/miyar/releases/latest/download/ExamStudio.apk" rel="noopener"><span class="apk-ic" aria-hidden="true">▼</span> تحميل تطبيق أندرويد (APK)</a>') +
       '<div class="row mob-only"><a class="btn" href="#/identity">' + I('grid') + ' هوية المؤسسة</a><a class="btn" href="#/docs">' + I('docs') + ' وثائق الجودة</a></div>' +
       '<div class="card"><div class="card-h"><h2 class="grow">الإصدار والتحديثات</h2><span class="chip ok">الإصدار <span class="p-code">' + esc(M.VERSION) + '</span></span></div>' +
       '<div class="small muted" style="margin-bottom:10px">التحديثات إجبارية: عند نشر إصدار جديد يظهر تنبيه صوتي ونافذة تحديث فوراً عند فتح التطبيق أو أثناء استخدامه (يُفحص كل ٣ دقائق)، ومع تفعيل الإشعارات يصلك إشعار حتى والتطبيق مغلق.' + (st.lastUpdateCheck ? ' آخر فحص: ' + n(M.fmtDate(st.lastUpdateCheck, true)) : '') + '</div>' +

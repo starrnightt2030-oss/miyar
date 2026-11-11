@@ -108,8 +108,16 @@ window.M = window.M || {};
     });
   };
 
+  /* داخل تطبيق الأندرويد: الملفات تُحفظ عبر الجسر في التنزيلات */
+  M.isAndroidApp = !!(window.ExamStudioAndroid && window.ExamStudioAndroid.saveFile);
   M.download = function (name, data, type) {
     var blob = data instanceof Blob ? data : new Blob([data], { type: type || 'application/octet-stream' });
+    if (M.isAndroidApp) {
+      var fr = new FileReader();
+      fr.onload = function () { try { window.ExamStudioAndroid.saveFile(String(name), blob.type || type || 'application/octet-stream', String(fr.result).split(',')[1] || ''); } catch (x) { M.toast && M.toast('تعذّر حفظ الملف', 'bad'); } };
+      fr.readAsDataURL(blob);
+      return;
+    }
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = name;

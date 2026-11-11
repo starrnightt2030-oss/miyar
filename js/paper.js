@@ -531,7 +531,11 @@
     var old = document.title; if (title) document.title = title;
     var imgs = M.qsa('img', area).filter(function (i) { return !i.complete; });
     Promise.all(imgs.map(function (i) { return new Promise(function (r) { i.onload = i.onerror = r; }); })).then(function () {
-      setTimeout(function () { window.print(); document.title = old; }, 60);
+      setTimeout(function () {
+        if (window.ExamStudioAndroid && window.ExamStudioAndroid.print) window.ExamStudioAndroid.print(document.title, size === 'a3' ? 'a3' : 'a4');
+        else window.print();
+        document.title = old;
+      }, 60);
     });
   };
 })(window.M);

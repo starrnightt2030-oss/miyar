@@ -99,7 +99,7 @@
     var date = e.examDate ? M.fmtDate(e.examDate) : '';
     var digits = ''; for (var i = 0; i < (Number(e.seatDigits) || 5); i++) digits += '<span class="p-digit"></span>';
     return '<div class="pblock p-data">' +
-      (e.showStudent !== false ? '<div class="r1"><span class="f nm"><span class="k">اسم الطالب</span><i></i></span><span class="f"><span class="k">رقم الجلوس</span>' + digits + '</span></div>' : '') +
+      (e.showStudent !== false ? '<div class="r1"><span class="f nm"><span class="k">اسم الطالب</span><i></i></span>' + (e.showSeat !== false ? '<span class="f"><span class="k">رقم الجلوس</span>' + digits + '</span>' : '') + '</div>' : '') +
       '<div class="r2">' +
       '<span class="f"><span class="k">الصف الدراسي</span>' + val(e.className) + '</span>' +
       '<span class="f"><span class="k">التخصص</span>' + val(e.specialization) + '</span>' +

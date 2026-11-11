@@ -234,7 +234,7 @@
         '<div class="ie-row">' + stepper('st-fs', Number(e.fontSize) || 14, 'حجم الخط') + field('الأرقام', segHTML('tp-dg', [['arabic', '١٢٣'], ['english', '123']], e.digits || 'arabic')) + '</div>' +
         field('مقاس الورق', segHTML('tp-paper', [['a4', 'A4'], ['a3-booklet', 'A3 كتيّب'], ['a3-spread', 'A3 صفحتان']], e.paper || 'a4')) +
         field('لغة الورقة', segHTML('tp-lang', [['ar', 'عربي'], ['en', 'English']], e.lang || 'ar')) +
-        '<div class="sw-list">' + tg('showStudent', 'بيانات الطالب ورقم الجلوس', true) + tg('showGradeTable', 'جدول الدرجات', true) + tg('showDoc', 'مربع وثيقة الجودة في الترويسة', true) + tg('showInstructions', 'سطر التعليمات', true) + tg('showSign', 'توقيعات المصحح والمراجع', true) + tg('compact', 'مسافات مضغوطة (صفحات أقل)', false) + tg('largePrint', 'طباعة مكبّرة (لضعاف البصر)', false) + tg('shuffleOptions', 'خلط ترتيب الاختيارات', false) + '</div>' +
+        '<div class="sw-list">' + tg('showStudent', 'سطر اسم الطالب', true) + tg('showGradeTable', 'جدول الدرجات', true) + tg('showDoc', 'مربع وثيقة الجودة في الترويسة', true) + tg('showInstructions', 'سطر التعليمات', true) + tg('showSign', 'توقيعات المصحح والمراجع', true) + tg('compact', 'مسافات مضغوطة (صفحات أقل)', false) + tg('largePrint', 'طباعة مكبّرة (لضعاف البصر)', false) + tg('shuffleOptions', 'خلط ترتيب الاختيارات', false) + '</div>' +
         '<button type="button" class="btn" id="tp-def">' + I('check', 16) + ' اجعل هذا التنسيق افتراضياً للامتحانات الجديدة</button></div>';
     }
     var thumbCache = {};
@@ -259,7 +259,8 @@
         inp('subjectName', 'المادة', 'الكهرباء العامة') + inp('className', 'الصف الدراسي', 'الصف الأول') + inp('specialization', 'التخصص', 'كهرباء') +
         inp('duration', 'الزمن', 'ساعتان') + inp('examDate', 'التاريخ (فارغ = يُكتب باليد)', '', 'date') + inp('year', 'العام الدراسي', '') + inp('model', 'رمز النموذج', 'أ / ب') +
         field('الدرجة الكلية المطلوبة', '<input class="inp" data-en="totalGrade" inputmode="numeric" value="' + n(e.totalGrade || '') + '" placeholder="' + n(M.examTotal(e)) + '">') +
-        field('خانات رقم الجلوس', '<input class="inp" data-en="seatDigits" inputmode="numeric" value="' + n(e.seatDigits || 5) + '">') + '</div>' +
+        (e.showSeat !== false ? field('خانات رقم الجلوس', '<input class="inp" data-en="seatDigits" inputmode="numeric" value="' + n(e.seatDigits || 5) + '">') : '') + '</div>' +
+        '<label class="sw"><input type="checkbox" data-eb="showSeat" data-def="1"' + (e.showSeat !== false ? ' checked' : '') + '><span></span>رقم الجلوس <span class="small muted">— اقفله لاختبار الميدترم</span></label>' +
         field('سطر التعليمات', '<input class="inp" data-ek="instructions" value="' + esc(e.instructions || '') + '">') +
         field('جملة أسفل كل صفحة', '<input class="inp" data-ek="footerNote" value="' + esc(e.footerNote != null ? e.footerNote : 'مع أطيب التمنيات بالنجاح والتوفيق') + '">') +
         field('وثيقة الجودة في الترويسة', '<select class="inp" data-ek="docId"><option value="">— الافتراضية —</option>' + docs.map(function (d) { return '<option value="' + d.id + '"' + (d.id === e.docId ? ' selected' : '') + '>' + esc(d.name + ' (' + d.code + ' — إصدار ' + d.version + ')') + '</option>'; }).join('') + '</select>') +
@@ -337,7 +338,7 @@
       on('[data-extras]', 'oninput', function (el) { curQ().extras = el.value.split(/[؛;]/).map(function (x) { return x.trim(); }).filter(Boolean); touch(); });
       on('[data-qb]', 'onchange', function (el) { curQ()[el.dataset.qb] = el.checked; touch(); });
       on('[data-sb]', 'onchange', function (el) { var s = sec(sel.s), k = el.dataset.sb; if (k === 'layout2') s.layout = el.checked ? 'two' : 'auto'; else s[k] = el.checked; touch(k === 'part'); });
-      on('[data-eb]', 'onchange', function (el) { e[el.dataset.eb] = el.checked; touch(); });
+      on('[data-eb]', 'onchange', function (el) { e[el.dataset.eb] = el.checked; touch(el.dataset.eb === 'showSeat'); });
       on('[data-correct]', 'onclick', function (b) { curQ().correct = +b.dataset.correct; touch(true); });
       on('[data-delopt]', 'onclick', function (b) { var q = curQ(), i = +b.dataset.delopt; q.options.splice(i, 1); if (q.correct >= q.options.length || q.correct === i) q.correct = 0; else if (q.correct > i) q.correct--; touch(true); });
       on('[data-addopt]', 'onclick', function () { curQ().options.push(''); touch(true); var ins = M.qsa('[data-opt]', p); if (ins.length) ins[ins.length - 1].focus(); });

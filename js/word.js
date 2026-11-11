@@ -92,7 +92,7 @@
     out.push(k.para('', { after: 40 }));
     var G = M.secInfo(exam).groups, dots = '……………';
     /* بيانات الطالب والورقة */
-    if (exam.showStudent !== false) out.push(k.table([[k.cell('اسم الطالب: ' + '……………………………………………………', { w: 6966, size: 11 }), k.cell('رقم الجلوس: ' + '……………', { w: 3500, size: 11 })]], [6966, 3500]));
+    if (exam.showStudent !== false) out.push(exam.showSeat !== false ? k.table([[k.cell('اسم الطالب: ' + '……………………………………………………', { w: 6966, size: 11 }), k.cell('رقم الجلوس: ' + '……………', { w: 3500, size: 11 })]], [6966, 3500]) : k.table([[k.cell('اسم الطالب: ' + '…………………………………………………………………………………', { w: 10466, size: 11 })]], [10466]));
     out.push(k.table([[
       k.cell('الصف الدراسي: ' + (exam.className || dots), { w: 2093, size: 10 }), k.cell('التخصص: ' + (exam.specialization || dots), { w: 2093, size: 10 }),
       k.cell('المادة: ' + (M.examSubject(exam) || dots), { w: 2093, size: 10 }), k.cell('الزمن: ' + (exam.duration || dots), { w: 2093, size: 10 }),

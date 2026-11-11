@@ -66,7 +66,9 @@
   M.can = function (what) {
     var r = M.role();
     if (what === 'approve') return r === 'head' || r === 'admin';
-    if (what === 'docs' || what === 'merge' || what === 'center') return r === 'admin';
+    /* الإصدار ٢: مستخدم واحد يدير هويته ووثائقه */
+    if (what === 'docs' || what === 'center') return true;
+    if (what === 'merge') return r === 'admin';
     return true;
   };
 

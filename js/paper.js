@@ -74,6 +74,7 @@
         '<span class="k">كود الوثيقة</span><span><span class="p-code">' + M.esc(doc.code) + '</span></span>' +
         '<span class="k">رقم الإصدار</span><span>' + c.num(doc.version) + '</span>' +
         '<span class="k">تاريخ الإصدار</span><span>' + c.num(M.fmtDate(doc.issueDate)) + '</span>' +
+        '<span class="k">رقم التعديل</span><span>' + c.num(doc.revision || '00') + (doc.revisionDate ? ' — ' + c.num(M.fmtDate(doc.revisionDate)) : '') + '</span>' +
         '<span class="k">الصفحة</span><span>' + pageNoPh + '</span>'
       : '<span class="k">اسم الوثيقة</span><span>—</span><span class="k">كود الوثيقة</span><span>—</span><span class="k">رقم الإصدار</span><span>—</span><span class="k">الصفحة</span><span>' + pageNoPh + '</span>';
     return '<div class="pblock p-head' + (showDoc ? '' : ' nodoc') + '">' +
@@ -273,7 +274,7 @@
     var doc = e.docId ? M.byId('docs', e.docId) : M.docFor('exam');
     var note = e.footerNote != null ? e.footerNote : (c.en ? 'Best wishes for success' : 'مع أطيب التمنيات بالنجاح والتوفيق');
     return '<div class="p-foot"><span class="wish">' + c.T(note) + '</span>' +
-      '<span>' + (doc ? '<span class="p-code">' + M.esc(doc.code) + '</span> · الإصدار ' + c.num(doc.version) + ' · ' : '') + 'صفحة <b data-pn></b> من <b data-pt></b></span></div>';
+      '<span>' + (doc ? '<span class="p-code">' + M.esc(doc.code) + '</span> · الإصدار ' + c.num(doc.version) + ' · التعديل ' + c.num(doc.revision || '00') + ' · ' : '') + 'صفحة <b data-pn></b> من <b data-pt></b></span></div>';
   }
 
   function miniHeadHTML(c) {

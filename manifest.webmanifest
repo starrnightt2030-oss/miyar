@@ -4,7 +4,7 @@
   "description": "تصميم أوراق امتحانات احترافية بمعاينة حية — يعمل بدون إنترنت. Designed & Developed by Mohamed-Eldawly",
   "lang": "ar",
   "dir": "rtl",
-  "id": "./",
+  "id": "/miyar/exam-studio",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

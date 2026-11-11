@@ -76,7 +76,7 @@
   };
 
   function hardReload() {
-    var p = window.caches ? caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }) : Promise.resolve();
+    var p = window.caches ? caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k.indexOf('miyar-') === 0; }).map(function (k) { return caches.delete(k); })); }) : Promise.resolve();
     p.then(function () { location.replace(location.pathname + '?v=' + Date.now() + location.hash); });
   }
 
@@ -122,6 +122,10 @@
     if (!('serviceWorker' in navigator) || location.protocol.indexOf('http') !== 0) return;
     navigator.serviceWorker.register('sw.js').then(function (r) {
       reg = r;
+      /* تأكد أن ملفات العمل بدون إنترنت كاملة (قد تمسحها تطبيقات أخرى على نفس الدومين) */
+      var ensure = function () { var w = r.active || navigator.serviceWorker.controller; if (w && navigator.onLine) w.postMessage({ type: 'ENSURE_CACHE' }); };
+      setTimeout(ensure, 4000); window.addEventListener('online', ensure);
+      document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') setTimeout(ensure, 1500); });
       /* لو في نسخة جديدة نزلت بالفعل وتنتظر */
       if (r.waiting && navigator.serviceWorker.controller) M.checkUpdate();
       r.addEventListener('updatefound', function () {

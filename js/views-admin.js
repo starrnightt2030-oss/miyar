@@ -83,14 +83,14 @@
     var admin = M.can('docs');
     var list = S.docs.slice().sort(function (a, b) { return String(a.code).localeCompare(String(b.code)); });
     var rows = list.map(function (d) {
-      return '<tr><td><b>' + esc(d.name) + '</b><div class="small muted">' + esc(M.DOC_TYPES[d.type] || '') + '</div></td><td><span class="p-code">' + esc(d.code) + '</span></td><td>' + n(d.version) + '</td><td>' + n(M.fmtDate(d.issueDate)) + '</td>' +
+      return '<tr><td><b>' + esc(d.name) + '</b><div class="small muted">' + esc(M.DOC_TYPES[d.type] || '') + '</div></td><td><span class="p-code">' + esc(d.code) + '</span></td><td>' + n(d.version) + '</td><td>' + n(d.revision || '00') + (d.revisionDate ? '<div class="small muted">' + n(M.fmtDate(d.revisionDate)) + '</div>' : '') + '</td><td>' + n(M.fmtDate(d.issueDate)) + '</td>' +
         '<td class="small">' + esc(d.preparedBy || '—') + ' / ' + esc(d.reviewedBy || '—') + ' / ' + esc(d.approvedBy || '—') + '</td>' +
         '<td>' + (d.active !== false ? '<span class="chip ok">سارية</span>' : '<span class="chip">موقوفة</span>') + '</td>' +
         '<td><div class="row" style="gap:4px;flex-wrap:nowrap">' + (d.file ? '<button class="btn sm" data-dl="' + d.id + '">' + I('download', 16) + ' الملف</button>' : '') + (admin ? '<button class="btn sm" data-ed="' + d.id + '">' + I('edit', 16) + '</button>' : '') + '</div></td></tr>';
     }).join('');
     main.innerHTML = M.topbar('وثائق الجودة', 'المعلومات الموثقة — تظهر بيانات الوثيقة السارية في ترويسة كل مخرج', admin ? '<button class="btn pri" id="dc-new">' + I('plus') + ' وثيقة</button>' : '') +
       '<div class="content">' + (!admin ? '<div class="alert info">' + I('lock') + '<div>إضافة الوثائق وتعديلها لمدير النظام فقط.</div></div>' : '') +
-      (rows ? '<div class="card flat"><div class="scroll-x"><table class="tbl"><thead><tr><th>الوثيقة</th><th>الكود</th><th>الإصدار</th><th>تاريخ الإصدار</th><th>إعداد / مراجعة / اعتماد</th><th>الحالة</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      (rows ? '<div class="card flat"><div class="scroll-x"><table class="tbl"><thead><tr><th>الوثيقة</th><th>الكود</th><th>الإصدار</th><th>التعديل</th><th>تاريخ الإصدار</th><th>إعداد / مراجعة / اعتماد</th><th>الحالة</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'
         : '<div class="empty">لم تُسجّل وثائق بعد. أضف وثيقة «ورقة امتحان» و«بنك أسئلة» و«جدول مواصفات» بالأسماء والأكواد المعتمدة لديكم.</div>') + '</div>';
     var nb = M.qs('#dc-new', main); if (nb) nb.onclick = function () { editDoc(null); };
     M.qsa('[data-ed]', main).forEach(function (b) { b.onclick = function () { editDoc(M.byId('docs', b.dataset.ed)); }; });
@@ -98,21 +98,24 @@
 
     function editDoc(d) {
       var isNew = !d;
-      d = d ? JSON.parse(JSON.stringify(d)) : { name: '', code: '', version: '01', issueDate: M.today(), type: 'exam', preparedBy: '', reviewedBy: '', approvedBy: '', active: true, history: [] };
-      var hist = (d.history || []).map(function (h) { return '<tr><td>' + n(h.version) + '</td><td>' + n(M.fmtDate(h.issueDate)) + '</td><td>' + n(M.fmtDate(h.archivedAt, true)) + '</td><td class="small">' + esc(h.note || '') + '</td></tr>'; }).join('');
+      d = d ? JSON.parse(JSON.stringify(d)) : { name: '', code: '', version: '01', revision: '00', revisionDate: '', issueDate: M.today(), type: 'exam', preparedBy: '', reviewedBy: '', approvedBy: '', active: true, history: [] };
+      if (d.revision == null) d.revision = '00';
+      var hist = (d.history || []).map(function (h) { return '<tr><td>' + n(h.version) + (h.revision != null ? ' / ' + n(h.revision) : '') + '</td><td>' + n(M.fmtDate(h.issueDate)) + '</td><td>' + n(M.fmtDate(h.archivedAt, true)) + '</td><td class="small">' + esc(h.note || '') + '</td></tr>'; }).join('');
       M.modal({ title: isNew ? 'وثيقة جديدة' : 'تعديل الوثيقة', wide: true,
         body: '<div class="grid2"><div class="field"><label for="d-n">اسم الوثيقة</label><input id="d-n" class="inp" value="' + esc(d.name) + '"></div>' +
           '<div class="field"><label for="d-t">النوع (أين تُستخدم)</label><select id="d-t" class="inp">' + Object.keys(M.DOC_TYPES).map(function (k) { return '<option value="' + k + '"' + (k === d.type ? ' selected' : '') + '>' + M.DOC_TYPES[k] + '</option>'; }).join('') + '</select></div>' +
           '<div class="field"><label for="d-c">كود الوثيقة</label><input id="d-c" class="inp" dir="ltr" style="text-align:right" value="' + esc(d.code) + '"></div>' +
           '<div class="field"><label for="d-v">رقم الإصدار</label><input id="d-v" class="inp" value="' + esc(d.version) + '"' + (isNew ? '' : ' disabled') + '></div>' +
           '<div class="field"><label for="d-i">تاريخ الإصدار</label><input id="d-i" class="inp" type="date" value="' + esc(String(d.issueDate || '').slice(0, 10)) + '"' + (isNew ? '' : ' disabled') + '></div>' +
+          '<div class="field"><label for="d-rv">رقم التعديل</label><input id="d-rv" class="inp" inputmode="numeric" value="' + esc(d.revision) + '"></div>' +
+          '<div class="field"><label for="d-rd">تاريخ التعديل</label><input id="d-rd" class="inp" type="date" value="' + esc(String(d.revisionDate || '').slice(0, 10)) + '"></div>' +
           '<label class="check" style="align-self:end"><input type="checkbox" id="d-a"' + (d.active !== false ? ' checked' : '') + '> سارية</label>' +
           '<div class="field"><label for="d-p">إعداد</label><input id="d-p" class="inp" value="' + esc(d.preparedBy) + '"></div>' +
           '<div class="field"><label for="d-r">مراجعة</label><input id="d-r" class="inp" value="' + esc(d.reviewedBy) + '"></div>' +
           '<div class="field"><label for="d-ap">اعتماد</label><input id="d-ap" class="inp" value="' + esc(d.approvedBy) + '"></div></div>' +
           '<div class="field"><span class="lbl">نسخة الوثيقة (PDF أو Word) — اختياري</span><div class="row"><span class="small" id="d-fn">' + esc(d.fileName || 'لا يوجد ملف') + '</span><button type="button" class="btn sm" id="d-f">رفع ملف</button></div></div>' +
-          (!isNew ? '<div class="card" style="padding:12px"><div class="row"><b style="flex:1">إصدار جديد</b><button type="button" class="btn sm" id="d-bump">رفع الإصدار</button></div><div class="small muted">يحفظ الإصدار الحالي في السجل ويبدأ إصداراً جديداً بتاريخ اليوم.</div>' +
-            (hist ? '<table class="tbl" style="margin-top:8px"><thead><tr><th>الإصدار السابق</th><th>تاريخه</th><th>أُرشف في</th><th>سبب التعديل</th></tr></thead><tbody>' + hist + '</tbody></table>' : '') + '</div>' : ''),
+          (!isNew ? '<div class="card" style="padding:12px"><div class="row"><b style="flex:1">تعديل أو إصدار جديد</b><button type="button" class="btn sm" id="d-rev">تعديل جديد</button><button type="button" class="btn sm" id="d-bump">رفع الإصدار</button></div><div class="small muted">«تعديل جديد» يزيد رقم التعديل بتاريخ اليوم. «رفع الإصدار» يبدأ إصداراً جديداً ويعيد التعديل إلى ٠٠. كلاهما يُحفظ في السجل مع السبب.</div>' +
+            (hist ? '<table class="tbl" style="margin-top:8px"><thead><tr><th>الإصدار / التعديل السابق</th><th>تاريخه</th><th>أُرشف في</th><th>سبب التعديل</th></tr></thead><tbody>' + hist + '</tbody></table>' : '') + '</div>' : ''),
         foot: '<button class="btn pri" data-ok>حفظ</button><button class="btn" data-x>إلغاء</button>' + (!isNew ? '<button class="btn danger" id="d-del">حذف</button>' : ''),
         onMount: function (m, close) {
           M.qs('#d-f', m).onclick = function () {
@@ -126,12 +129,24 @@
           if (bump) bump.onclick = function () {
             M.prompt('رفع الإصدار', 'سبب التعديل', '').then(function (note) {
               if (note == null) return;
-              d.history = (d.history || []).concat([{ version: d.version, issueDate: d.issueDate, archivedAt: M.now(), note: note }]);
+              d.history = (d.history || []).concat([{ version: d.version, revision: d.revision, issueDate: d.issueDate, archivedAt: M.now(), note: note }]);
               var v = String(d.version), num = parseInt(M.toWestern(v), 10);
               d.version = isFinite(num) ? String(num + 1).padStart(v.length, '0') : v + '.1';
-              d.issueDate = M.today();
-              M.qs('#d-v', m).value = d.version; M.qs('#d-i', m).value = d.issueDate;
+              d.issueDate = M.today(); d.revision = '00'; d.revisionDate = '';
+              M.qs('#d-v', m).value = d.version; M.qs('#d-i', m).value = d.issueDate; M.qs('#d-rv', m).value = d.revision; M.qs('#d-rd', m).value = '';
               M.toast('سيُحفظ الإصدار ' + d.version + ' عند الضغط على حفظ');
+            });
+          };
+          var rev = M.qs('#d-rev', m);
+          if (rev) rev.onclick = function () {
+            M.prompt('تعديل جديد', 'سبب التعديل', '').then(function (note) {
+              if (note == null) return;
+              d.history = (d.history || []).concat([{ version: d.version, revision: d.revision, issueDate: d.issueDate, archivedAt: M.now(), note: note }]);
+              var r = String(M.qs('#d-rv', m).value || d.revision || '00'), num = parseInt(M.toWestern(r), 10);
+              d.revision = isFinite(num) ? String(num + 1).padStart(Math.max(2, r.length), '0') : r + '.1';
+              d.revisionDate = M.today();
+              M.qs('#d-rv', m).value = d.revision; M.qs('#d-rd', m).value = d.revisionDate;
+              M.toast('سيُحفظ التعديل ' + d.revision + ' عند الضغط على حفظ');
             });
           };
           M.qs('[data-ok]', m).onclick = function () {
@@ -139,6 +154,7 @@
             if (!d.name || !d.code) return M.toast('الاسم والكود مطلوبان', 'bad');
             d.type = M.qs('#d-t', m).value; d.active = M.qs('#d-a', m).checked;
             if (isNew) { d.version = M.qs('#d-v', m).value.trim() || '01'; d.issueDate = M.qs('#d-i', m).value || M.today(); }
+            d.revision = M.toWestern(M.qs('#d-rv', m).value.trim()) || '00'; d.revisionDate = M.qs('#d-rd', m).value || '';
             d.preparedBy = M.qs('#d-p', m).value.trim(); d.reviewedBy = M.qs('#d-r', m).value.trim(); d.approvedBy = M.qs('#d-ap', m).value.trim();
             M.save('docs', d).then(function () { close(); M.toast('تم حفظ الوثيقة', 'ok'); M.render(); });
           };

@@ -34,7 +34,13 @@ self.addEventListener('activate', function (e) {
     return Promise.all(keys.filter(function (k) { return k.indexOf('miyar-') === 0 && k !== CACHE && k !== 'miyar-meta'; }).map(function (k) { return caches.delete(k); }));
   }).then(function () { return self.clients.claim(); }));
 });
-self.addEventListener('message', function (e) { if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting(); });
+self.addEventListener('message', function (e) {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
+  /* إصلاح ذاتي: تطبيق آخر على نفس الدومين قد يمسح ملفاتنا المحفوظة — نعيد تنزيل الناقص فقط */
+  if (e.data && e.data.type === 'ENSURE_CACHE') e.waitUntil(caches.open(CACHE).then(function (c) {
+    return Promise.all(FILES.map(function (f) { return c.match(f, { ignoreSearch: true }).then(function (hit) { if (!hit) return fetch(f, { cache: 'reload' }).then(function (r) { if (r.ok) return c.put(f, r); }).catch(function () {}); }); }));
+  }));
+});
 self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') return;
   var url = new URL(e.request.url);

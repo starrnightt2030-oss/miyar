@@ -85,7 +85,8 @@
       k.para([k.run('اسم الوثيقة: ', { bold: true, size: 9 }), k.run(doc.name, { size: 9 })], { after: 0 }),
       k.para([k.run('كود الوثيقة: ', { bold: true, size: 9 }), new d.TextRun({ text: doc.code || '', size: 18, font: FONT })], { after: 0 }),
       k.para([k.run('رقم الإصدار: ', { bold: true, size: 9 }), k.run(doc.version, { size: 9 })], { after: 0 }),
-      k.para([k.run('تاريخ الإصدار: ', { bold: true, size: 9 }), k.run(M.fmtDate(doc.issueDate), { size: 9 })], { after: 0 })
+      k.para([k.run('تاريخ الإصدار: ', { bold: true, size: 9 }), k.run(M.fmtDate(doc.issueDate), { size: 9 })], { after: 0 }),
+      k.para([k.run('رقم التعديل: ', { bold: true, size: 9 }), k.run(String(doc.revision || '00') + (doc.revisionDate ? ' — ' + M.fmtDate(doc.revisionDate) : ''), { size: 9 })], { after: 0 })
     ] : [k.para('—', { center: true })];
     var out = [k.table([[k.cell(c1, { w: 3300 }), k.cell(c2, { w: 3866 }), k.cell(c3, { w: 3300 })]], [3300, 3866, 3300])];
     out.push(k.para('', { after: 40 }));
@@ -201,7 +202,7 @@
     var d = k.d, doc = exam.docId ? M.byId('docs', exam.docId) : M.docFor('exam');
     var note = exam.footerNote != null ? exam.footerNote : 'مع أطيب التمنيات بالنجاح والتوفيق';
     return new d.Footer({ children: [].concat(note ? [new d.Paragraph({ bidirectional: true, alignment: d.AlignmentType.CENTER, children: [k.run(note, { size: 10, bold: true })] })] : [], [new d.Paragraph({ bidirectional: true, alignment: d.AlignmentType.CENTER, children: [
-      k.run((doc ? doc.code + ' · الإصدار ' + doc.version + ' · ' : '') + 'صفحة ', { size: 9 }),
+      k.run((doc ? doc.code + ' · الإصدار ' + doc.version + ' · التعديل ' + (doc.revision || '00') + ' · ' : '') + 'صفحة ', { size: 9 }),
       new d.TextRun({ children: [d.PageNumber.CURRENT], size: 18, font: FONT }), k.run(' من ', { size: 9 }),
       new d.TextRun({ children: [d.PageNumber.TOTAL_PAGES], size: 18, font: FONT })] })]) });
   }

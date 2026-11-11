@@ -11,7 +11,7 @@ const files = [];
 (function walk(d) {
   for (const f of fs.readdirSync(path.join(root, d))) {
     const rel = d ? d + '/' + f : f;
-    if (/^(\.|tools|supabase|sw\.js$|version\.json$|README|SETUP|node_modules)/.test(rel) || /\.(md|bat|zip|toml|sql|ts)$/.test(f)) continue;
+    if (/^(\.|tools|android|supabase|sw\.js$|version\.json$|README|SETUP|node_modules)/.test(rel) || /\.(md|bat|zip|toml|sql|ts)$/.test(f)) continue;
     if (fs.statSync(path.join(root, rel)).isDirectory()) walk(rel); else files.push('./' + rel);
   }
 })('');

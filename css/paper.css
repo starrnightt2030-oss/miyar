@@ -252,3 +252,11 @@ u.ans{text-decoration:none;border-bottom:1.5px solid #1D4ED8;color:#1E3A8A;paddi
 .sd-pages .p-sec.sd-hl{outline-style:dashed}
 .sd-pages [data-q]{cursor:pointer}
 @media print{.sd-hl{outline:0!important;background:none!important}}
+
+/* تصدير PDF المباشر: نفس قواعد الطباعة */
+.pdf-host .page{box-shadow:none!important;margin:0!important}
+.pdf-host .sheet{margin:0!important}
+.pdf-host .sheet-lbl{display:none!important}
+.pdf-host .sheet-in{box-shadow:none!important}
+.pdf-host .sheet-in::after{border-left-color:#E5E7EB}
+.pdf-host .sd-hl{outline:0!important;background:none!important}

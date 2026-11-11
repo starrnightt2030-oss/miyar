@@ -81,7 +81,7 @@
       '<header class="sd-top"><a class="btn icon ghost" href="#/exams" aria-label="رجوع إلى الامتحانات">' + I('back') + '</a>' +
       '<div class="sd-ttl"><input id="sd-title" aria-label="اسم الامتحان"><span class="small muted"><span id="sd-sub"></span> · <span id="sd-save">محفوظ ✓</span></span></div>' +
       '<button class="btn icon ghost" id="sd-undo" aria-label="تراجع" title="تراجع (Ctrl+Z)">' + I('undo') + '</button><button class="btn icon ghost" id="sd-redo" aria-label="إعادة" title="إعادة (Ctrl+Y)">' + I('redo') + '</button>' +
-      '<button class="btn hide-sm" id="sd-word">' + I('download', 16) + ' Word</button><button class="btn pri" id="sd-out">' + I('print', 16) + ' إخراج</button></header>' +
+      '<button class="btn hide-sm" id="sd-pdf">' + I('download', 16) + ' PDF</button><button class="btn hide-sm" id="sd-word">' + I('download', 16) + ' Word</button><button class="btn pri" id="sd-out">' + I('print', 16) + ' إخراج</button></header>' +
       '<div class="sd-body" id="sd-body">' +
       '<section class="sd-panel" id="sd-panel"><nav class="sd-tabs" role="tablist">' +
       [['q', 'الأسئلة'], ['tpl', 'القالب'], ['info', 'البيانات'], ['check', 'المراجعة']].map(function (t) { return '<button type="button" role="tab" data-tab="' + t[0] + '">' + t[1] + '</button>'; }).join('') +
@@ -289,13 +289,16 @@
         (iss.length ? '<div class="chk-list">' + iss.map(function (x) { return '<button type="button" class="chk ' + x.k + '"' + (x.s != null ? ' data-go="' + x.s + ':' + x.i + '"' : '') + '>' + esc(x.t) + '</button>'; }).join('') + '</div>' : '') +
         '<div class="out-grid">' + OUT.map(function (o) { return '<button type="button" class="out" data-out="' + o[0] + '">' + I(o[1], 22) + '<b>' + o[2] + '</b><span>' + o[3] + '</span></button>'; }).join('') + '</div></div>';
     }
-    var OUT = [['print', 'print', 'طباعة / PDF', 'الورقة بالقالب والمقاس المختار'], ['word', 'download', 'ملف Word', 'للتعديل أو الإرسال'], ['keyp', 'print', 'مفتاح الإجابة', 'طباعة / PDF'], ['keyw', 'download', 'المفتاح Word', 'نموذج الإجابة'],
+    var OUT = [['pdf', 'download', 'ملف PDF جاهز', 'الامتحان فقط بالقالب والمقاس — جاهز للطباعة والإرسال'], ['word', 'download', 'ملف Word', 'للتعديل أو الإرسال'], ['print', 'print', 'طباعة مباشرة', 'يفتح نافذة الطباعة'],
+      ['keypdf', 'download', 'مفتاح الإجابة PDF', 'نموذج الإجابة جاهز'], ['keyw', 'download', 'المفتاح Word', 'نموذج الإجابة'], ['keyp', 'print', 'طباعة المفتاح', 'يفتح نافذة الطباعة'],
       ['models', 'copy', 'نموذجان (أ) و(ب)', 'نفس الأسئلة بترتيب مختلف'], ['tpl', 'layers', 'احفظ الهيكل كقالب', 'امتحان جديد بنفس التقسيم والدرجات'], ['file', 'download', 'ملف للمشاركة', 'يفتحه زميلك في التطبيق']];
 
     function doOut(a) {
       var title = (e.title || 'امتحان') + (e.model ? ' - نموذج ' + e.model : '');
       persist.flush ? persist.flush() : null;
       if (a === 'print') { var sh = M.examSheets(e); M.printPages(sh.items, title, sh.size); M.sound && M.sound('done'); if (sh.size === 'a3') M.toast('اطبع على A3 أفقي — للكتيّب: على الوجهين مع القلب من الحافة القصيرة'); }
+      if (a === 'pdf') { var sp = M.examSheets(e); M.exportPDF(sp.items, title, sp.size); }
+      if (a === 'keypdf') M.exportPDF(M.renderKeyPages(e), 'مفتاح الإجابة - ' + title);
       if (a === 'word') { M.renderExamPages(e); M.exportExamWord(e).catch(function (er) { M.toast('تعذّر التصدير: ' + er.message, 'bad'); }); }
       if (a === 'keyp') M.printPages(M.renderKeyPages(e), 'مفتاح الإجابة - ' + title);
       if (a === 'keyw') M.exportKeyWord(e);
@@ -632,6 +635,7 @@
         onMount: function (m, close) { M.qsa('[data-out]', m).forEach(function (b) { b.onclick = function () { close(); doOut(b.dataset.out); }; }); } });
     };
     M.qs('#sd-word', app).onclick = function () { doOut('word'); };
+    M.qs('#sd-pdf', app).onclick = function () { doOut('pdf'); };
 
     /* تغيير المساحة بين اللوحة والورقة */
     (function () {

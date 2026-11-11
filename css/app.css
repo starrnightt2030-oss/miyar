@@ -205,7 +205,8 @@ textarea.inp{min-height:80px;resize:vertical;line-height:1.7}
 #printArea{display:none}
 @media print{
   body{background:#fff}
-  .app,.overlay,.toasts,.mnav{display:none!important}
+  body>*:not(#printArea),.app,.overlay,.toasts,.mnav{display:none!important}
+  html,body{margin:0;padding:0;background:#fff!important;height:auto!important;overflow:visible!important}
   #printArea{display:block}
 }
 

@@ -1,5 +1,5 @@
 /* معيار — Service Worker (مولَّد تلقائياً بواسطة tools/release.js — لا تعدّله يدوياً) */
-var VERSION = '2.0.2';
+var VERSION = '2.0.3';
 var CACHE = 'miyar-' + VERSION;
 var FILES = [
   "./config.json",
@@ -40,12 +40,17 @@ var FILES = [
   "./js/install.js",
   "./js/math.js",
   "./js/paper.js",
+  "./js/pdf.js",
   "./js/safety.js",
   "./js/sound.js",
   "./js/store.js",
   "./js/studio.js",
   "./js/update.js",
   "./js/util.js",
+  "./js/vendor/LICENSE-html-to-image",
+  "./js/vendor/LICENSE-jspdf",
+  "./js/vendor/html-to-image.js",
+  "./js/vendor/jspdf.umd.min.js",
   "./js/version.js",
   "./js/views-admin.js",
   "./js/views-bank.js",

@@ -67,13 +67,6 @@ var FILES = [
   "./vendor/docx.umd.js",
   "./vendor/supabase.js",
   "./vendor/xlsx.full.min.js",
-  "./x/ex-progress.png",
-  "./x/ex-review.png",
-  "./x/ex-setup.png",
-  "./x/ex2-review.png",
-  "./x/ex2-setup.png",
-  "./x/lib.png",
-  "./x/src-preview.png",
   "./"
 ];
 

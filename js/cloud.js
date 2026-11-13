@@ -123,12 +123,54 @@
 
   C.dirtyCount = function () { return SYNC.reduce(function (s, st) { return s + S[st].filter(function (r) { return dirty(r, st); }).length; }, 0) + (S.settings.tombstones || []).length; };
 
+  /* قبل الرفع: نقرأ توقيت نسخة الخادم لكل سجل معدّل محلياً.
+     لو الخادم فيه نسخة أحدث من آخر نسخة استلمناها (cloudAt) وأحدث من تعديلنا → لا نكتب فوقها:
+     نطبّقها بقاعدة التعارض (الأحدث يفوز والأخرى تُحفظ في التعارضات) */
+  var tms = function (x) { var t = Date.parse(x); return isNaN(t) ? 0 : t; };
+  function guard(store, rows) {
+    if (!rows.length) return Promise.resolve(rows);
+    var ids = rows.map(function (r) { return r.id; }), chunks = [];
+    for (var i = 0; i < ids.length; i += 150) chunks.push(ids.slice(i, i + 150));
+    return Promise.all(chunks.map(function (c) { return C.client.from('records').select('id,updated_at,deleted').in('id', c); })).then(function (res) {
+      var srv = {};
+      res.forEach(function (r) { if (r.error) throw r.error; (r.data || []).forEach(function (x) { srv[x.id] = x; }); });
+      var risky = rows.filter(function (r) {
+        var x = srv[r.id]; if (!x) return false;
+        var base = tms(r.cloudAt), st = tms(x.updated_at);
+        return st > base && st !== tms(stampOf(r, store));
+      });
+      if (!risky.length) return rows;
+      var rid = risky.map(function (r) { return r.id; });
+      return C.client.from('records').select('*').in('id', rid).then(function (full) {
+        if (full.error) throw full.error;
+        return (full.data || []).reduce(function (p, row) { return p.then(function () { return applyRow(row); }); }, Promise.resolve());
+      }).then(function () {
+        /* ما زال معدّلاً محلياً = نسختنا هي الأحدث فنرفعها؛ غير ذلك اعتُمدت نسخة الخادم */
+        return S[store].filter(function (r) { return dirty(r, store) && ids.indexOf(r.id) >= 0; }).map(function (r) {
+          if (rid.indexOf(r.id) >= 0) { var x = srv[r.id]; r.cloudAt = x && x.updated_at; }
+          return r;
+        });
+      });
+    });
+  }
+
   C.push = function () {
     var isAdmin = C.profile && C.profile.role === 'admin';
     var jobs = [];
     SYNC.forEach(function (store) {
       if (store === 'docs' && !isAdmin) return;
-      var rows = S[store].filter(function (r) { return dirty(r, store); });
+      jobs.push(guard(store, S[store].filter(function (r) { return dirty(r, store); })).then(function (rows) { return pushRows(store, rows); }));
+    });
+    var tomb = (S.settings.tombstones || []).slice();
+    if (tomb.length) {
+      jobs.push(C.client.from('records').upsert(tomb.map(function (t) { return { id: t.id, store: t.store, data: {}, updated_at: t.at, deleted: true }; })).then(function (res) {
+        if (!res.error) M.setSetting('tombstones', (S.settings.tombstones || []).filter(function (t) { return !tomb.some(function (x) { return x.id === t.id; }); }));
+      }));
+    }
+    return Promise.all(jobs);
+  };
+  function pushRows(store, rows) {
+      var jobs = [];
       /* دفعات بحجم معقول */
       var batch = [], size = 0;
       var flush = function (list) {
@@ -151,15 +193,8 @@
         batch.push(r); size += s;
       });
       flush(batch);
-    });
-    var tomb = (S.settings.tombstones || []).slice();
-    if (tomb.length) {
-      jobs.push(C.client.from('records').upsert(tomb.map(function (t) { return { id: t.id, store: t.store, data: {}, updated_at: t.at, deleted: true }; })).then(function (res) {
-        if (!res.error) M.setSetting('tombstones', (S.settings.tombstones || []).filter(function (t) { return !tomb.some(function (x) { return x.id === t.id; }); }));
-      }));
-    }
-    return Promise.all(jobs);
-  };
+      return Promise.all(jobs);
+  }
 
   var changedSinceRender = false;
   function applyRow(row) {
@@ -179,28 +214,50 @@
       return M.db.put(store, inc);
     };
     if (!local) return put();
-    if (!dirty(local, store)) return stampOf(inc, store) >= stampOf(local, store) ? put() : Promise.resolve();
-    /* تعديل هنا وهناك: الأحدث يفوز، والآخر يُحفظ في التعارضات */
-    if (stampOf(inc, store) > stampOf(local, store)) {
-      return M.db.put('conflicts', { id: M.uid(), at: M.now(), store: store, recId: local.id, kept: 'remote', data: local, by: row.updated_by }).then(put);
+    if (!dirty(local, store)) {
+      if (local.cloudAt && tms(local.cloudAt) === tms(stampOf(inc, store)) && tms(stampOf(local, store)) === tms(local.cloudAt)) return Promise.resolve();
+      return tms(stampOf(inc, store)) >= tms(stampOf(local, store)) ? put() : Promise.resolve();
     }
-    return M.db.put('conflicts', { id: M.uid(), at: M.now(), store: store, recId: local.id, kept: 'local', data: inc, by: row.updated_by });
+    /* نسخة نعرفها بالفعل (هي أساس تعديلنا أو تعديلنا نفسه) — ليست تعارضاً */
+    var ti = tms(stampOf(inc, store));
+    if ((local.cloudAt && ti <= tms(local.cloudAt)) || ti === tms(stampOf(local, store))) return Promise.resolve();
+    /* تعديل هنا وهناك: الأحدث يفوز، والآخر يُحفظ في التعارضات */
+    if (ti > tms(stampOf(local, store))) return keepConflict(store, local, 'remote', row).then(put);
+    return keepConflict(store, inc, 'local', row);
+  }
+
+  /* السحب بمؤشر مركّب (server_at, id): السجلات المرفوعة في عملية واحدة تأخذ نفس server_at،
+     فالمؤشر الزمني وحده كان يُسقط ما بعد أول ٤٠٠ منها. ونبدأ بهامش رجوع بسيط لالتقاط عمليات
+     تأخر اعتمادها على الخادم — وتطبيق السجل مرتين آمن */
+  var PAGE = 400;
+  function keepConflict(store, data, kept, row) {
+    return M.db.all('conflicts').then(function (list) {
+      var st = stampOf(data, store);
+      if (list.some(function (c) { return c.recId === data.id && stampOf(c.data, store) === st; })) return;
+      return M.db.put('conflicts', { id: M.uid(), at: M.now(), store: store, recId: data.id, kept: kept, data: data, by: row.updated_by });
+    });
   }
 
   C.pull = function () {
-    var since = S.settings.cloudPullAt || '1970-01-01T00:00:00Z';
-    var page = function (from) {
-      return C.client.from('records').select('*').gt('server_at', from).order('server_at', { ascending: true }).limit(400).then(function (r) {
+    var cur = S.settings.cloudPullCur || { at: S.settings.cloudPullAt || '1970-01-01T00:00:00Z', id: '' };
+    var back = new Date(Math.max(0, tms(cur.at) - 10000)).toISOString();
+    var startAt = cur.id ? back : cur.at, startId = '';
+    var q = function (v) { return '"' + String(v).replace(/"/g, '') + '"'; };
+    var page = function (at, id) {
+      var b = C.client.from('records').select('*');
+      b = id ? b.or('server_at.gt.' + q(at) + ',and(server_at.eq.' + q(at) + ',id.gt.' + q(id) + ')') : b.gte('server_at', at);
+      return b.order('server_at', { ascending: true }).order('id', { ascending: true }).limit(PAGE).then(function (r) {
         if (r.error) throw r.error;
         var rows = r.data || [];
         return rows.reduce(function (p, row) { return p.then(function () { return applyRow(row); }); }, Promise.resolve()).then(function () {
-          if (!rows.length) return from;
-          var last = rows[rows.length - 1].server_at;
-          return M.setSetting('cloudPullAt', last).then(function () { return rows.length === 400 ? page(last) : last; });
+          if (!rows.length) return;
+          var last = rows[rows.length - 1];
+          var nc = { at: last.server_at, id: last.id };
+          return M.setSetting('cloudPullCur', nc).then(function () { return M.setSetting('cloudPullAt', nc.at); }).then(function () { return rows.length === PAGE ? page(nc.at, nc.id) : null; });
         });
       });
     };
-    return page(since);
+    return page(startAt, startId);
   };
 
   C.sync = function () {
@@ -208,7 +265,7 @@
     if (C.busy) return C.busy;
     if (!navigator.onLine) { setStatus('offline'); return Promise.resolve(); }
     setStatus('syncing'); C.errors = 0; changedSinceRender = false;
-    C.busy = C.push().then(C.pull).then(function () {
+    C.busy = C.pull().then(C.push).then(function () {
       C.lastSync = M.now(); M.setSetting('cloudLastSync', C.lastSync);
       var stuck = SYNC.some(function (st) { return S[st].some(function (r) { return r.cloudErr; }); });
       setStatus(C.errors || stuck ? 'error' : 'online');
@@ -381,7 +438,7 @@
         if (!ok) return;
         var jobs = [];
         SYNC.forEach(function (st) { S[st].filter(function (r) { return r.cloudErr; }).forEach(function (r) { S[st] = S[st].filter(function (x) { return x.id !== r.id; }); jobs.push(M.db.del(st, r.id)); }); });
-        Promise.all(jobs).then(function () { return M.setSetting('cloudPullAt', '1970-01-01T00:00:00Z'); }).then(C.sync).then(function () { M.toast('تم الاسترجاع', 'ok'); M.render(); });
+        Promise.all(jobs).then(function () { return M.setSetting('cloudPullAt', '1970-01-01T00:00:00Z'); }).then(function () { return M.setSetting('cloudPullCur', null); }).then(C.sync).then(function () { M.toast('تم الاسترجاع', 'ok'); M.render(); });
       });
     });
     on('cl-push', function () { C.enablePush(false).then(M.render); });

@@ -23,11 +23,17 @@
   function mk(mode, exam) {
     var d = D();
     var T = function (s) { return M.digits(String(s == null ? '' : s), mode); };
-    var ALLB = !!(exam && exam.boldText), SC = exam && !exam.compact && !exam.largePrint ? (Number(exam.fontSize) || 14) / 14 : 1;
-    var SZ = function (s) { return Math.round((s || 12) * SC * 2); };
+    var ALLB = !!(exam && exam.boldText), TY = exam ? M.typo(exam) : { v2: false };
+    /* النمط الجديد: نص السؤال = نفس النقاط المطبوعة في PDF، والترويسة والتذييل بأحجام ثابتة */
+    var SC = TY.v2 ? TY.pt / 12 : (exam && !exam.compact && !exam.largePrint ? (Number(exam.fontSize) || 14) / 14 : 1);
+    var LINE = TY.v2 ? ({ normal: 300, comfort: 360, large: 330 }[TY.typo] || 300) : 300;
+    if (exam && ['economy'].indexOf(exam.theme) >= 0) LINE = Math.max(276, LINE - 24);
+    if (exam && ['comfort'].indexOf(exam.theme) >= 0) LINE = Math.max(LINE, 360);
+    var fixed = false, BW = !!(exam && M.BW_THEMES && M.BW_THEMES.indexOf(exam.theme) >= 0);
+    var SZ = function (s) { return Math.round((s || 12) * (fixed ? (TY.v2 ? 1 : SC) : SC) * 2); };
     var run = function (text, o) {
       o = o || {};
-      return new d.TextRun({ text: T(text), rightToLeft: true, bold: ALLB || !!o.bold, size: SZ(o.size), font: FONT, color: o.color });
+      return new d.TextRun({ text: T(text), rightToLeft: true, bold: ALLB || !!o.bold, size: SZ(o.size), font: FONT, color: BW ? undefined : o.color });
     };
     var richRuns = function (text, o) {
       o = o || {};
@@ -35,7 +41,7 @@
       String(text == null ? '' : text).split(/(\$[^$]+\$)/g).forEach(function (part) {
         if (!part) return;
         if (/^\$[^$]+\$$/.test(part)) {
-          M.mathRuns(part.slice(1, -1)).forEach(function (r) { out.push(new d.TextRun({ text: T(r.text), rightToLeft: true, bold: ALLB || !!o.bold, size: SZ(o.size), font: FONT, color: o.color, superScript: !!r.sup, subScript: !!r.sub })); });
+          M.mathRuns(part.slice(1, -1)).forEach(function (r) { out.push(new d.TextRun({ text: T(r.text), rightToLeft: true, bold: ALLB || !!o.bold, size: SZ(o.size), font: FONT, color: BW ? undefined : o.color, superScript: !!r.sup, subScript: !!r.sub })); });
         } else out.push(run(part.replace(/\[\[(.+?)\]\]/g, '……………………'), o));
       });
       return out.length ? out : [run('', o)];
@@ -45,9 +51,9 @@
       if (typeof children === 'string') children = richRuns(children, o);
       return new d.Paragraph({
         children: children, bidirectional: true,
-        alignment: o.center ? d.AlignmentType.CENTER : undefined,
-        spacing: { before: o.before || 0, after: o.after == null ? 60 : o.after, line: o.line || 300 },
-        border: o.bottomLine ? { bottom: { style: d.BorderStyle.SINGLE, size: 8, color: '1F2A44', space: 2 } } : undefined
+        alignment: o.center ? d.AlignmentType.CENTER : undefined, keepNext: !!o.keepNext, keepLines: true,
+        spacing: { before: o.before || 0, after: o.after == null ? 60 : o.after, line: o.line || LINE },
+        border: o.bottomLine ? { bottom: { style: d.BorderStyle.SINGLE, size: 8, color: BW ? '000000' : '1F2A44', space: 2 } } : undefined
       });
     };
     var NB = { top: { style: d.BorderStyle.NONE, size: 0, color: 'FFFFFF' }, bottom: { style: d.BorderStyle.NONE, size: 0, color: 'FFFFFF' }, left: { style: d.BorderStyle.NONE, size: 0, color: 'FFFFFF' }, right: { style: d.BorderStyle.NONE, size: 0, color: 'FFFFFF' }, insideHorizontal: { style: d.BorderStyle.NONE, size: 0, color: 'FFFFFF' }, insideVertical: { style: d.BorderStyle.NONE, size: 0, color: 'FFFFFF' } };
@@ -56,7 +62,7 @@
       var kids = Array.isArray(content) ? content : [typeof content === 'string' ? para(content, o) : content];
       return new d.TableCell({
         children: kids, width: o.w ? { size: o.w, type: d.WidthType.DXA } : undefined, columnSpan: o.span,
-        shading: o.shade ? { fill: o.shade, type: d.ShadingType.CLEAR, color: 'auto' } : undefined,
+        shading: o.shade && !BW ? { fill: o.shade, type: d.ShadingType.CLEAR, color: 'auto' } : undefined,
         verticalAlign: d.VerticalAlign.CENTER,
         margins: { top: 40, bottom: 40, left: 90, right: 90 }
       });
@@ -69,10 +75,11 @@
         visuallyRightToLeft: true, borders: o.noBorder ? NB : undefined
       });
     };
-    return { d: d, T: T, run: run, para: para, cell: cell, table: table, richRuns: richRuns };
+    return { d: d, T: T, run: run, para: para, cell: cell, table: table, richRuns: richRuns, bw: BW, fix: function (v) { fixed = !!v; } };
   }
 
   function headerBlocks(k, exam, logoImg) {
+    k.fix(true);
     var d = k.d, cen = M.S.settings.center || {}, doc = exam.docId ? M.byId('docs', exam.docId) : M.docFor('exam');
     var sub = M.byId('subjects', exam.subjectId);
     var c1 = [];
@@ -84,7 +91,6 @@
       k.para('مادة ' + M.examSubject(exam), { bold: true, size: 13, center: true, after: 20 })];
     c2.push(k.para('العام الدراسي ' + (exam.year || M.S.settings.year), { size: 11, center: true, after: 0 }));
     var c3 = doc ? [
-      k.para([k.run('اسم الوثيقة: ', { bold: true, size: 9 }), k.run(doc.name, { size: 9 })], { after: 0 }),
       k.para([k.run('كود الوثيقة: ', { bold: true, size: 9 }), new d.TextRun({ text: doc.code || '', size: 18, font: FONT })], { after: 0 }),
       k.para([k.run('رقم الإصدار: ', { bold: true, size: 9 }), k.run(doc.version, { size: 9 })], { after: 0 }),
       k.para([k.run('تاريخ الإصدار: ', { bold: true, size: 9 }), k.run(M.fmtDate(doc.issueDate), { size: 9 })], { after: 0 }),
@@ -117,6 +123,7 @@
       out.push(k.table([r1, r2, r3], widths));
     }
     if (exam.showInstructions !== false && exam.instructions) out.push(k.para(exam.instructions, { before: 60, size: 11 }));
+    k.fix(false);
     return out;
   }
 
@@ -141,11 +148,11 @@
   function sectionBlocks(k, exam, sec, idx, imgs) {
     var d = k.d, out = [], L = exam.lang === 'en' ? M.EN_LETTERS : M.AR_LETTERS;
     var title = sec.title || M.TYPE[sec.type].title, si = M.secInfo(exam), inf = si.info[idx];
-    if (!inf.hasParts) out.push(k.para([k.run('السؤال ' + M.ordinal(inf.main) + ': ', { bold: true, size: 13, color: '1F2A44' }), k.run(title, { bold: true, size: 13 }), k.run('   (' + M.gradeWord(M.sectionGrade(exam, sec)) + ')', { bold: true, size: 11 })], { before: 160, after: 80, bottomLine: true }));
+    if (!inf.hasParts) out.push(k.para([k.run('السؤال ' + M.ordinal(inf.main) + ': ', { bold: true, size: 13, color: '1F2A44' }), k.run(title, { bold: true, size: 13 }), k.run('   (' + M.gradeWord(M.sectionGrade(exam, sec)) + ')', { bold: true, size: 11 })], { before: 160, after: 80, bottomLine: true, keepNext: true }));
     else {
       var grp = si.groups[inf.main];
-      if (inf.first) out.push(k.para([k.run('السؤال ' + M.ordinal(inf.main) + ': ', { bold: true, size: 13, color: '1F2A44' }), k.run(exam.sections[grp.start].mainTitle || 'أجب عن الأسئلة الآتية:', { bold: true, size: 13 }), k.run('   (' + M.gradeWord(M.groupGrade(exam, grp)) + ')', { bold: true, size: 11 })], { before: 160, after: 60, bottomLine: true }));
-      out.push(k.para([k.run('(' + M.partLabel(exam, inf.part) + ') ', { bold: true, size: 13, color: '1F2A44' }), k.run(title, { bold: true, size: 12 }), k.run('   (' + M.gradeWord(M.sectionGrade(exam, sec)) + ')', { size: 10 })], { before: 80, after: 60 }));
+      if (inf.first) out.push(k.para([k.run('السؤال ' + M.ordinal(inf.main) + ': ', { bold: true, size: 13, color: '1F2A44' }), k.run(exam.sections[grp.start].mainTitle || 'أجب عن الأسئلة الآتية:', { bold: true, size: 13 }), k.run('   (' + M.gradeWord(M.groupGrade(exam, grp)) + ')', { bold: true, size: 11 })], { before: 160, after: 60, bottomLine: true, keepNext: true }));
+      out.push(k.para([k.run('(' + M.partLabel(exam, inf.part) + ') ', { bold: true, size: 13, color: '1F2A44' }), k.run(title, { bold: true, size: 12 }), k.run('   (' + M.gradeWord(M.sectionGrade(exam, sec)) + ')', { size: 10 })], { before: 80, after: 60, keepNext: true }));
     }
     if (sec.type === 'tf') {
       var rows = sec.items.map(function (it, i) { var q = M.itemQ(exam, it); return [k.cell(String(i + 1), { w: 600, center: true }), k.cell(blankify(q.text), { w: 8666 }), k.cell('(       )', { w: 1200, center: true })]; });
@@ -171,7 +178,7 @@
       if (sec.type === 'mcq') {
         var mq = [], fq = figPara(k, q, imgs), pos = q.figurePos || 'below';
         if (pos === 'above') mq = mq.concat(fq);
-        mq.push(k.para(no + blankify(q.text), { after: 20 }));
+        mq.push(k.para(no + blankify(q.text), { after: 20, keepNext: true }));
         if (pos !== 'above' && pos !== 'after') mq = mq.concat(fq);
         out = out.concat(mq);
         var order = M.mcqOrder(exam, sec, q), opts = order.map(function (j) { return q.options[j]; });
@@ -203,10 +210,13 @@
   function footer(k, exam) {
     var d = k.d, doc = exam.docId ? M.byId('docs', exam.docId) : M.docFor('exam');
     var note = exam.footerNote != null ? exam.footerNote : 'مع أطيب التمنيات بالنجاح والتوفيق';
-    return new d.Footer({ children: [].concat(note ? [new d.Paragraph({ bidirectional: true, alignment: d.AlignmentType.CENTER, children: [k.run(note, { size: 10, bold: true })] })] : [], [new d.Paragraph({ bidirectional: true, alignment: d.AlignmentType.CENTER, children: [
+    k.fix(true);
+    var f = new d.Footer({ children: [].concat(note ? [new d.Paragraph({ bidirectional: true, alignment: d.AlignmentType.CENTER, children: [k.run(note, { size: 10, bold: true })] })] : [], [new d.Paragraph({ bidirectional: true, alignment: d.AlignmentType.CENTER, children: [
       k.run((doc ? doc.code + ' · الإصدار ' + doc.version + ' · التعديل ' + (doc.revision || '00') + ' · ' : '') + 'صفحة ', { size: 9 }),
       new d.TextRun({ children: [d.PageNumber.CURRENT], size: 18, font: FONT }), k.run(' من ', { size: 9 }),
       new d.TextRun({ children: [d.PageNumber.TOTAL_PAGES], size: 18, font: FONT })] })]) });
+    k.fix(false);
+    return f;
   }
 
   function save(doc, name) {

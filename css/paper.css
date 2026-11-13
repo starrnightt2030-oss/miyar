@@ -278,3 +278,134 @@ u.ans{text-decoration:none;border-bottom:1.5px solid #1D4ED8;color:#1E3A8A;paddi
 .p-infig.v-top{align-self:start}.p-infig.v-middle{align-self:center}.p-infig.v-bottom{align-self:end}
 .p-infig img{width:100%;max-height:420px;object-fit:contain;display:block;mix-blend-mode:multiply}
 .p-infig .cap{text-align:center;font-size:.86em;margin-top:2px;color:#374151}
+
+/* ===================== الإصدار ٢٫١ ===================== */
+/* الخط بنقاط الطباعة: الصفحة 794px = 210mm بالضبط، فـ 1pt على الشاشة = 1pt على الورق.
+   عناصر الترويسة والجداول بأحجام ثابتة مقروءة، ونص الأسئلة يتبع --pfs */
+.page.v2{--plh:1.6;--pgap:9px}
+.v2 .p-head .c1 b,.v2 .p-lines-id b{font-size:11.5pt}
+.v2 .p-head .c1 span,.v2 .p-lines-id{font-size:9.5pt}
+.v2 .p-head .c2 .t1{font-size:15pt}
+.v2 .p-head .c2 .t2{font-size:13pt}
+.v2 .p-head .c2 .t3{font-size:11pt}
+.v2 .p-doc{font-size:9pt}
+.v2 .p-mini{font-size:10pt}
+.v2 .p-info,.v2 .p-data,.v2 .p-instr{font-size:11pt}
+.v2 .p-grades{font-size:10pt}
+.v2 .p-data .nm i,.v2 .p-data i.s{height:1.2em}
+.v2 .p-digit{width:1.3em;height:1.6em}
+.v2 .p-sec-h .t{font-size:calc(var(--pfs) * 1.07)}
+.v2 .p-sec-h .n{min-width:1.6em;height:1.6em;font-size:calc(var(--pfs) * .95)}
+.v2 .p-sec-h .g,.v2 .p-part-h .g{font-size:calc(var(--pfs) * .82)}
+.v2 .p-part-h .pl{font-size:calc(var(--pfs) * 1.05)}
+.v2 .p-opts .ring{width:.75em;height:.75em;margin-top:.5em}
+.v2 .p-tf{grid-template-columns:2.1em 1fr 4.2em}
+.v2 .blank{min-width:7em}
+.v2 .p-match{grid-template-columns:1fr 5em 1fr}
+.v2 .p-img .lbls{grid-template-columns:2.2em 1fr}
+.v2 .p-cont,.v2 .p-end{font-size:11pt}
+.v2 .p-foot{font-size:9pt}
+.v2 .p-sign{font-size:10pt}
+.v2 .p-sol::before,.v2 .p-ansg.p-sol::before{font-size:.8em}
+.v2 .k-sec h4{font-size:calc(var(--pfs) * 1.02)}
+.v2 .k-row .g{font-size:calc(var(--pfs) * .82)}
+.v2 .spec{font-size:10pt}
+.v2 .p-draw.grid{background-size:5mm 5mm}
+.p-frag{font-size:.8em;font-weight:700;color:#374151;margin-bottom:2px}
+/* أنماط الخط */
+.v2.ty-normal{--plh:1.6;--pgap:9px}
+.v2.ty-comfort{--plh:1.85;--pgap:13px}
+.v2.ty-comfort .p-sec{gap:6px}
+.v2.ty-comfort .p-sec.sep-space .p-item{margin-bottom:10px}
+.v2.ty-comfort .p-mcq{gap:12px}
+.v2.ty-comfort .p-opts{gap:4px 20px}
+.v2.ty-large{--plh:1.75;--pgap:12px}
+.v2.ty-large .p-sec.sep-space .p-item{margin-bottom:9px}
+.v2.ty-large .p-lines i{height:calc(var(--pfs) * 1.9)}
+
+/* ===== قوالب الأبيض والأسود =====
+   نص أسود وحدود سوداء واضحة، بلا خلفيات ولا مساحات معبأة تستهلك الحبر — مهما كان اللون المختار */
+.page.bw{--pc:#000!important;color:#000}
+.bw .p-head .c1 span,.bw .p-head .c2 .t3,.bw .p-foot,.bw .p-part-h .g,.bw .p-img .cap,.bw .p-fig .cap,.bw .p-fside .cap,.bw .p-infig .cap,.bw .k-row .g{color:#000}
+.bw .p-doc .k,.bw .p-grades .hd,.bw .p-grades .tot,.bw .p-match .hd,.bw .spec th,.bw .p-instr{background:transparent}
+.bw .p-grades .lead{background:transparent;color:#000;font-weight:700}
+.bw .p-grades,.bw .p-info,.bw .p-data,.bw .p-tf,.bw .p-img .lbls,.bw .p-draw{border-color:#000}
+.bw .p-doc span,.bw .p-grades span,.bw .p-data .r1,.bw .p-data .f+.f,.bw .p-tf span,.bw .p-info span+span{border-color:#555}
+.bw .p-sec-h .n{background:transparent;color:#000;border:1.4px solid #000}
+.bw .p-sec-h .g{border-color:#000}
+.bw .p-sol::before,.bw .p-ansg.p-sol::before{color:#333}
+.bw .p-lines i{border-bottom-color:#333}
+.bw .p-opts .ring{border-color:#000}
+.bw .p-draw.grid{background-image:linear-gradient(#BDBDBD .6px,transparent .6px),linear-gradient(90deg,#BDBDBD .6px,transparent .6px)}
+.bw u.ans{border-bottom-color:#000;color:#000;font-weight:700}
+.bw .p-sec.sep-dotted .p-item:not(:last-child){border-bottom-color:#777}
+.bw .p-sec.sep-line .p-item:not(:last-child),.bw .p-sec.sep-box .p-item{border-color:#777}
+.bw .p-frag{color:#000}
+
+/* ١) رسمي بسيط: ترويسة مربّعة منظمة، رقم السؤال في مربع، والدرجة في إطار */
+.th-official .p-head{border:1.5px solid #000;border-radius:0}
+.th-official .p-head .c2{border-inline:1px solid #000}
+.th-official .p-doc .k{font-weight:700}
+.th-official .p-data,.th-official .p-grades,.th-official .p-info{border-radius:0}
+.th-official .p-sec-h{border-bottom:1.2px solid #000;padding-bottom:4px}
+.th-official .p-sec-h .n{border-radius:0}
+.th-official .p-sec-h .g{border-radius:0;padding:0 10px}
+
+/* ٢) أكاديمي: خطوط أفقية بدل الصناديق، وفاصل رفيع بين الأسئلة */
+.th-academic .p-head{border:0;border-top:2.2px solid #000;border-bottom:.8px solid #000;border-radius:0}
+.th-academic .p-head .c2{border:0}
+.th-academic .p-doc span{border-bottom-color:#999}
+.th-academic .p-info{border:0;border-bottom:.8px solid #000;border-radius:0}
+.th-academic .p-data{border-radius:0;border-width:.8px 0}
+.th-academic .p-grades{border-radius:0}
+.th-academic .p-sec-h{border-bottom:0;padding-bottom:0}
+.th-academic .p-sec-h .n{border:0;min-width:0;padding:0;font-size:calc(var(--pfs) * 1.07)}
+.th-academic .p-sec-h .n::after{content:"."}
+.th-academic .p-sec-h .g{border:0;font-weight:600}
+
+.th-academic .pg-body>.p-sec+.p-sec,.th-academic .pg-body>.p-mini+.p-sec{border-top:.6px solid #000;padding-top:7px}
+.th-academic .pg-body>.p-mini+.p-sec{border-top:0;padding-top:0}
+
+/* ٣) اقتصادي: أقل حدود وحبر ومسافات — دون تصغير الخط */
+.th-economy{padding:22px 30px 16px;--pgap:6px}
+.th-economy.v2{--pgap:6px}
+.th-economy .p-head{border:0;border-bottom:1px solid #000;border-radius:0;grid-template-columns:1fr 1.4fr 1fr}
+.th-economy .p-head .c1{padding:4px 8px}
+.th-economy .p-head .c2{border:0;padding:4px}
+.th-economy .p-logo{width:48px;height:48px}
+.th-economy .p-doc span{padding:1px 6px;border-bottom:.6px dotted #888}
+.th-economy .p-info{border:0;border-radius:0}
+.th-economy .p-info span{padding:1px 8px}
+.th-economy .p-data{border:.8px solid #000;border-radius:0}
+.th-economy .p-data .f{padding:2px 8px}
+.th-economy .p-grades{border-width:.8px;border-radius:0}
+.th-economy .p-grades span{padding:1px 2px;min-height:0}
+.th-economy .p-sec{gap:2px}
+.th-economy .p-sec-h{border-bottom:.6px solid #000;padding-bottom:1px}
+.th-economy .p-sec-h .n{border:0;min-width:0;padding:0}
+.th-economy .p-sec-h .n::after{content:")"}
+.th-economy .p-sec-h .g{border:0}
+.th-economy .p-sec.sep-space .p-item{margin-bottom:3px}
+.th-economy .p-sec.sep-space .p-mcq{gap:4px}
+.th-economy .p-lines i{border-bottom-width:.6px}
+.th-economy .p-tf span{padding:0 6px}
+.th-economy .p-sign{margin-top:4px}
+
+/* ٤) مريح للقراءة: مسافات أكبر، سطور أوسع، ورقم السؤال واضح بخط عمودي */
+.th-comfort{--plh:1.9;--pgap:14px;padding:32px 40px 22px}
+.th-comfort.v2{--plh:1.9;--pgap:14px}
+.th-comfort .p-head{border:1.2px solid #000;border-radius:8px}
+.th-comfort .p-head .c2{border-inline:1px solid #000}
+.th-comfort .p-data,.th-comfort .p-grades,.th-comfort .p-info{border-radius:8px}
+.th-comfort .p-sec{gap:7px}
+.th-comfort .p-sec-h{border:0;border-inline-start:3px solid #000;padding:2px 10px}
+.th-comfort .p-sec-h .n{border:0;min-width:0;padding:0}
+.th-comfort .p-sec-h .g{border:1.2px solid #000;border-radius:99px;padding:0 12px}
+.th-comfort .p-sec.sep-space .p-item{margin-bottom:11px}
+.th-comfort .p-mcq{gap:12px}
+.th-comfort .p-opts{gap:5px 22px;padding-inline-start:28px}
+.th-comfort .p-item .st{gap:9px}
+.th-comfort .p-lines i{height:calc(var(--pfs) * 2)}
+
+.p-cont .p-end{margin-top:0}
+.v2 .p-sec .p-item:last-child{margin-bottom:0!important}

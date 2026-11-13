@@ -8,7 +8,7 @@
   M.newExam = function (subjectId) {
     var sub = M.byId('subjects', subjectId) || {};
     return { id: M.uid(), subjectId: subjectId, title: EXAM_TITLES[0], className: sub.className || '', specialization: sub.specialization || '', year: S.settings.year, duration: 'ساعتان', totalGrade: '',
-      docId: (M.docFor('exam') || {}).id || '', digits: S.settings.digits || 'arabic', lang: 'ar', paper: 'a4', fontSize: 14, color: '#1F2A44', compact: false, separator: 'none',
+      docId: (M.docFor('exam') || {}).id || '', digits: S.settings.digits || 'arabic', lang: 'ar', paper: 'a4', fontSize: 14, styleVer: 2, typo: M.examDefaults().typo, fontPt: M.examDefaults().fontPt, color: '#1F2A44', compact: false, separator: 'none',
       showStudent: true, showGradeTable: true, showInstructions: true, showSign: true, instructions: 'أجب عن جميع الأسئلة في نفس الورقة.', shuffleOptions: false,
       sections: [], local: {}, mode: 'bank', examDate: '', footerNote: S.settings.footerNote != null ? S.settings.footerNote : 'مع أطيب التمنيات بالنجاح والتوفيق',
       status: 'draft', model: '', groupId: '', scopeLessonIds: [], shuffleSeed: M.uid(), preparedBy: M.me().name || '' };
@@ -18,7 +18,8 @@
   /* إعدادات الورقة الافتراضية من «هوية المؤسسة» */
   M.examDefaults = function () {
     var d = S.settings.examDefaults || {};
-    return { theme: d.theme || 'classic', color: d.color || '#1F2A44', fontSize: d.fontSize || 14, duration: d.duration || 'ساعتان', className: d.className || '', specialization: d.specialization || '', itemSep: d.itemSep || 'space' };
+    return { theme: d.theme || 'classic', color: d.color || '#1F2A44', fontSize: d.fontSize || 14, duration: d.duration || 'ساعتان', className: d.className || '', specialization: d.specialization || '', itemSep: d.itemSep || 'space',
+      typo: M.TYPO && M.TYPO[d.typo] ? d.typo : 'normal', fontPt: Number(d.fontPt) || (M.TYPO && M.TYPO[d.typo] ? M.TYPO[d.typo].pt : 14) };
   };
 
   /* ===== بطاقة امتحان ===== */
@@ -136,7 +137,7 @@
             if (cq === 'empty') { e.title = M.qs('#nw-t', m).value.trim() || src.title; e.subjectName = M.qs('#nw-sn', m).value.trim() || M.examSubject(src); e.subjectId = ''; e.className = M.qs('#nw-c', m).value.trim(); e.specialization = M.qs('#nw-sp', m).value.trim(); }
           } else {
             e = M.newExam(''); var D2 = M.examDefaults();
-            e.mode = 'manual'; e.theme = D2.theme; e.color = D2.color; e.fontSize = D2.fontSize; e.duration = D2.duration; e.itemSep = D2.itemSep;
+            e.mode = 'manual'; e.theme = D2.theme; e.color = D2.color; e.typo = D2.typo; e.fontPt = D2.fontPt; e.duration = D2.duration; e.itemSep = D2.itemSep;
             e.title = M.qs('#nw-t', m).value.trim() || e.title; e.subjectName = M.qs('#nw-sn', m).value.trim();
             e.className = M.qs('#nw-c', m).value.trim(); e.specialization = M.qs('#nw-sp', m).value.trim();
             e.sections = [];

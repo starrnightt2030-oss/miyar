@@ -7,7 +7,8 @@
 
   M.TEMPLATES = [
     { id: 'classic', name: 'رسمي كلاسيكي' }, { id: 'modern', name: 'حديث' }, { id: 'minimal', name: 'بسيط — يوفّر الحبر' },
-    { id: 'frame', name: 'إطار رسمي' }, { id: 'band', name: 'شريط ملوّن' }, { id: 'elegant', name: 'أنيق — خط نسخ' }
+    { id: 'frame', name: 'إطار رسمي' }, { id: 'band', name: 'شريط ملوّن' }, { id: 'elegant', name: 'أنيق — خط نسخ' },
+    { id: 'official', name: 'رسمي بسيط', bw: true }, { id: 'academic', name: 'أكاديمي', bw: true }, { id: 'economy', name: 'اقتصادي — يوفّر الحبر', bw: true }, { id: 'comfort', name: 'مريح للقراءة', bw: true }
   ];
   M.ACCENTS = [['#1F2A44', 'كحلي'], ['#1D4ED8', 'أزرق'], ['#B91C1C', 'أحمر'], ['#0F766E', 'أخضر'], ['#6D28D9', 'بنفسجي'], ['#111827', 'أسود']];
   var SEPS = [['none', 'بدون'], ['space', 'مسافة'], ['dotted', 'خط منقّط'], ['line', 'خط متصل'], ['box', 'مربع لكل فرع']];
@@ -92,7 +93,7 @@
       '<section class="sd-paper" aria-label="معاينة الورقة"><div class="sd-ptools"><div class="seg" id="sd-view"><button type="button" data-v="paper" class="on">الورقة</button><button type="button" data-v="key">المفتاح</button></div>' +
       '<span class="sd-pc" id="sd-pc"></span><span style="flex:1"></span>' +
       '<div class="sd-fnt" role="group" aria-label="خط الامتحان كله"><button type="button" class="btn icon sm ghost" id="sd-fsm" aria-label="تصغير خط الامتحان كله" title="تصغير الخط للامتحان كله">A−</button><span id="sd-fsv" title="حجم خط الامتحان"></span><button type="button" class="btn icon sm ghost" id="sd-fsp" aria-label="تكبير خط الامتحان كله" title="تكبير الخط للامتحان كله">A+</button><button type="button" class="btn icon sm ghost" id="sd-bold" aria-label="خط عريض للامتحان كله" title="خط عريض (Bold) للامتحان كله"><b>B</b></button></div>' +
-      '<button class="btn icon sm ghost" id="sd-zo" aria-label="تصغير">' + I('zout', 18) + '</button><button class="btn sm ghost" id="sd-zf" aria-label="ملء العرض">' + I('fit', 16) + '</button><button class="btn icon sm ghost" id="sd-zi" aria-label="تكبير">' + I('zin', 18) + '</button></div>' +
+      '<button class="btn icon sm ghost" id="sd-zo" aria-label="تصغير المعاينة" title="تصغير المعاينة (لا يغيّر الطباعة)">' + I('zout', 18) + '</button><button class="btn sm ghost" id="sd-zf" aria-label="ملء العرض" title="المعاينة بعرض المساحة">' + I('fit', 16) + '</button><button class="btn icon sm ghost" id="sd-zi" aria-label="تكبير المعاينة" title="تكبير المعاينة (لا يغيّر الطباعة)">' + I('zin', 18) + '</button></div>' +
       '<div class="sd-pages" id="sd-pages"></div></section></div></div>';
     var body = M.qs('#sd-body', app), pagesBox = M.qs('#sd-pages', app);
     if (split) body.style.setProperty('--split', split + '%');
@@ -228,22 +229,36 @@
       return h;
     }
 
+    /* --- الخط: بنقاط الطباعة (مستقل عن تكبير المعاينة) --- */
+    function typoHTML() {
+      var ty = M.typo(e);
+      if (!ty.v2) return '<div class="alert info typo-old">' + I('warn') + '<div style="flex:1"><b>هذا الامتحان بالتنسيق القديم</b> — خط الأسئلة ≈ ' + n(ty.pt) + ' نقطة عند الطباعة. النمط الجديد يجعل الخط ' + n(14) + ' نقطة مطبوعة مع مسافات أوضح، وقد يزيد عدد الصفحات.<div class="row" style="margin-top:8px;gap:6px"><button type="button" class="btn sm pri" id="tp-newty">تطبيق النمط الجديد على هذا الامتحان</button></div></div></div>' +
+        '<div class="ie-row">' + stepper('st-fs', Number(e.fontSize) || 14, 'حجم الخط (تنسيق قديم)') + '</div>';
+      return field('حجم خط الامتحان', segHTML('tp-ty', Object.keys(M.TYPO).map(function (k) { return [k, M.TYPO[k].name]; }), ty.typo)) +
+        '<div class="ie-row">' + stepper('st-pt', ty.pt, 'حجم خط الأسئلة (نقطة مطبوعة)') + '</div>' +
+        '<div class="small muted" style="margin-top:-4px">الحجم هنا هو الحجم الحقيقي على الورق (١٤ نقطة = حجم الكتب المدرسية). أزرار التكبير فوق الورقة تكبّر المعاينة فقط ولا تغيّر الطباعة.</div>';
+    }
+
     /* --- القالب والتنسيق --- */
     function tplHTML() {
       var tg = function (k, label, def) { var on = def ? e[k] !== false : !!e[k]; return '<label class="sw"><input type="checkbox" data-eb="' + k + '" data-def="' + (def ? 1 : 0) + '"' + (on ? ' checked' : '') + '><span></span>' + label + '</label>'; };
       return '<div class="ie">' +
-        '<div class="field"><span class="lbl">القالب</span><div class="tpl-grid">' + M.TEMPLATES.map(function (t) { return '<button type="button" class="tpl' + ((e.theme || 'classic') === t.id ? ' on' : '') + '" data-tpl="' + t.id + '"><span class="th" data-th="' + t.id + '"></span><b>' + t.name + '</b></button>'; }).join('') + '</div></div>' +
+        (function () { var b = function (t) { return '<button type="button" class="tpl' + ((e.theme || 'classic') === t.id ? ' on' : '') + '" data-tpl="' + t.id + '"><span class="th" data-th="' + t.id + '"></span><b>' + t.name + '</b></button>'; };
+          return '<div class="field"><span class="lbl">قوالب للطباعة بالأبيض والأسود</span><div class="tpl-grid">' + M.TEMPLATES.filter(function (t) { return t.bw; }).map(b).join('') + '</div></div>' +
+            '<div class="field"><span class="lbl">قوالب ملوّنة</span><div class="tpl-grid">' + M.TEMPLATES.filter(function (t) { return !t.bw; }).map(b).join('') + '</div></div>'; })() +
+        (M.BW_THEMES.indexOf(e.theme) >= 0 ? '<div class="small muted">هذا القالب يطبع بالأسود دائماً — اللون يُستخدم في القوالب الملوّنة فقط.</div>' : '') +
         '<div class="field"><span class="lbl">اللون</span><div class="sw-row">' + M.ACCENTS.map(function (c) { return '<button type="button" class="swc' + ((e.color || '#1F2A44').toLowerCase() === c[0].toLowerCase() ? ' on' : '') + '" data-col="' + c[0] + '" style="background:' + c[0] + '" aria-label="' + c[1] + '"></button>'; }).join('') + '<label class="swc custom" aria-label="لون آخر"><input type="color" id="tp-col" value="' + esc(e.color || '#1F2A44') + '"></label></div></div>' +
         field('الفاصل بين الفروع', segHTML('tp-sep', SEPS, e.itemSep || 'space')) +
-        '<div class="ie-row">' + stepper('st-fs', Number(e.fontSize) || 14, 'حجم الخط') + field('الأرقام', segHTML('tp-dg', [['arabic', '١٢٣'], ['english', '123']], e.digits || 'arabic')) + '</div>' +
+        typoHTML() +
+        field('الأرقام', segHTML('tp-dg', [['arabic', '١٢٣'], ['english', '123']], e.digits || 'arabic')) +
         field('مقاس الورق', segHTML('tp-paper', [['a4', 'A4'], ['a3-booklet', 'A3 كتيّب'], ['a3-spread', 'A3 صفحتان']], e.paper || 'a4')) +
         field('لغة الورقة', segHTML('tp-lang', [['ar', 'عربي'], ['en', 'English']], e.lang || 'ar')) +
-        '<div class="sw-list">' + tg('boldText', 'خط عريض (Bold) للامتحان كله', false) + tg('showStudent', 'سطر اسم الطالب', true) + tg('showGradeTable', 'جدول الدرجات', true) + tg('showDoc', 'مربع وثيقة الجودة في الترويسة', true) + tg('showInstructions', 'سطر التعليمات', true) + tg('showSign', 'توقيعات المصحح والمراجع', true) + tg('compact', 'مسافات مضغوطة (صفحات أقل)', false) + tg('largePrint', 'طباعة مكبّرة (لضعاف البصر)', false) + tg('shuffleOptions', 'خلط ترتيب الاختيارات', false) + '</div>' +
+        '<div class="sw-list">' + tg('boldText', 'خط عريض (Bold) للامتحان كله', false) + tg('showStudent', 'سطر اسم الطالب', true) + tg('showGradeTable', 'جدول الدرجات', true) + tg('showDoc', 'مربع وثيقة الجودة في الترويسة', true) + tg('showInstructions', 'سطر التعليمات', true) + tg('showSign', 'توقيعات المصحح والمراجع', true) + (M.typo(e).v2 ? '' : tg('compact', 'مسافات مضغوطة (صفحات أقل)', false) + tg('largePrint', 'طباعة مكبّرة (لضعاف البصر)', false)) + tg('shuffleOptions', 'خلط ترتيب الاختيارات', false) + '</div>' +
         '<button type="button" class="btn" id="tp-def">' + I('check', 16) + ' اجعل هذا التنسيق افتراضياً للامتحانات الجديدة</button></div>';
     }
     var thumbCache = {};
     function drawThumbs() {
-      var key = JSON.stringify([e.sections.length, e.color, e.title, e.fontSize, e.itemSep, Object.keys(e.local).length]);
+      var key = JSON.stringify([e.sections.length, e.color, e.title, e.fontSize, e.fontPt, e.typo, e.styleVer, e.itemSep, Object.keys(e.local).length]);
       M.TEMPLATES.forEach(function (t, k) {
         setTimeout(function () {
           var el = M.qs('[data-th="' + t.id + '"]', app); if (!el || tab !== 'tpl') return;
@@ -361,10 +376,10 @@
       on('#tp-dg button', 'onclick', function (b) { e.digits = b.dataset.v; touch(true); });
       on('#tp-paper button', 'onclick', function (b) { e.paper = b.dataset.v; touch(true); });
       on('#tp-lang button', 'onclick', function (b) { e.lang = b.dataset.v; touch(true); });
-      on('[data-tpl]', 'onclick', function (b) { e.theme = b.dataset.tpl; M.qsa('[data-tpl]', p).forEach(function (x) { x.classList.toggle('on', x === b); }); touch(); });
+      on('[data-tpl]', 'onclick', function (b) { var wasBW = M.BW_THEMES.indexOf(e.theme) >= 0; e.theme = b.dataset.tpl; M.qsa('[data-tpl]', p).forEach(function (x) { x.classList.toggle('on', x === b); }); touch(wasBW !== (M.BW_THEMES.indexOf(e.theme) >= 0)); });
       on('[data-col]', 'onclick', function (b) { e.color = b.dataset.col; thumbCache = {}; touch(true); });
       var cc = M.qs('#tp-col', p); if (cc) cc.onchange = function () { e.color = cc.value; thumbCache = {}; touch(true); };
-      var td = M.qs('#tp-def', p); if (td) td.onclick = function () { M.setSetting('examDefaults', Object.assign({}, S.settings.examDefaults || {}, { theme: e.theme || 'classic', color: e.color, fontSize: e.fontSize, itemSep: e.itemSep || 'space' })).then(function () { M.toast('حُفظ كتنسيق افتراضي', 'ok'); }); };
+      var td = M.qs('#tp-def', p); if (td) td.onclick = function () { M.setSetting('examDefaults', Object.assign({}, S.settings.examDefaults || {}, Object.assign({ theme: e.theme || 'classic', color: e.color, itemSep: e.itemSep || 'space' }, M.typo(e).v2 ? { typo: M.typo(e).typo, fontPt: M.typo(e).pt } : {}))).then(function () { M.toast('حُفظ كتنسيق افتراضي', 'ok'); }); };
       if (tab === 'tpl') drawThumbs();
       /* المتدرجات */
       stp(p, '#st-grade', function (v) { var q = curQ(); q.grade = Math.max(0, v); touch(); }, 0.5);
@@ -372,6 +387,9 @@
       stp(p, '#st-sol', function (v) { curQ().solLines = Math.max(0, Math.min(30, Math.round(v))); touch(); }, 1);
       stp(p, '#st-dh', function (v) { curQ().drawHeight = Math.max(40, Math.min(900, Math.round(v))); touch(); }, 20);
       stp(p, '#st-fs', function (v) { e.fontSize = Math.max(11, Math.min(24, v)); fntUI(); touch(); }, 0.5);
+      stp(p, '#st-pt', function (v) { e.fontPt = Math.max(11, Math.min(24, v)); fntUI(); touch(); }, 0.5);
+      on('#tp-ty button', 'onclick', function (b) { e.typo = b.dataset.v; e.fontPt = M.TYPO[e.typo].pt; fntUI(); touch(true); });
+      var nty = M.qs('#tp-newty', p); if (nty) nty.onclick = function () { M.applyNewTypo(e); thumbCache = {}; fntUI(); touch(true); M.toast('طُبّق النمط الجديد — يمكنك التراجع بزر «تراجع»', 'ok'); };
       var ug = M.qs('#sk-ugo', p); if (ug) ug.onclick = function () { var v = Number(M.toWestern(M.qs('#sk-ug', p).value)); if (!(v >= 0)) return M.toast('اكتب الدرجة', 'bad'); sec(sel.s).items.forEach(function (it) { var q = qOf(it); if (q) q.grade = v; }); touch(true); M.toast('طُبّقت الدرجة على كل الفروع', 'ok'); };
       /* أفعال القسم والفرع */
       on('[data-sact]', 'onclick', function (b) { secAct(b.dataset.sact); });
@@ -642,12 +660,16 @@
     /* أدوات المعاينة */
     M.qsa('#sd-view button', app).forEach(function (b) { b.onclick = function () { view = b.dataset.v; M.qsa('#sd-view button', app).forEach(function (x) { x.classList.toggle('on', x === b); }); renderPaper(); }; });
     function fntUI() {
-      var v = M.qs('#sd-fsv', app); if (v) v.textContent = e.largePrint ? 'مكبّر' : n(Number(e.fontSize) || 14);
+      var ty = M.typo(e), v = M.qs('#sd-fsv', app);
+      if (v) { v.textContent = ty.v2 ? n(ty.pt) : (e.largePrint ? 'مكبّر' : n(Number(e.fontSize) || 14)); v.title = ty.v2 ? 'حجم خط الأسئلة: ' + ty.pt + ' نقطة مطبوعة' : 'تنسيق قديم بالبكسل'; }
       var bb = M.qs('#sd-bold', app); if (bb) { bb.classList.toggle('on', !!e.boldText); bb.setAttribute('aria-pressed', e.boldText ? 'true' : 'false'); }
     }
     function bumpFont(d) {
-      if (e.largePrint || e.compact) { e.largePrint = false; e.compact = false; }
-      e.fontSize = Math.max(11, Math.min(24, (Number(e.fontSize) || 14) + d));
+      if (M.typo(e).v2) e.fontPt = Math.max(11, Math.min(24, M.typo(e).pt + d));
+      else {
+        if (e.largePrint || e.compact) { e.largePrint = false; e.compact = false; }
+        e.fontSize = Math.max(11, Math.min(24, (Number(e.fontSize) || 14) + d));
+      }
       fntUI(); touch(tab === 'tpl');
     }
     M.qs('#sd-fsm', app).onclick = function () { bumpFont(-1); };

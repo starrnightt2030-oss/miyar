@@ -53,6 +53,26 @@
       }
       M.STORES.forEach(function (s, i) { S[s] = (res[i + 1] || []).filter(Boolean); });
       S.log.sort(function (a, b) { return a.at < b.at ? 1 : -1; });
+    }).then(function () { return M.migrate(); });
+  };
+
+  /* ===== ترقية البيانات =====
+     كل خطوة تُطبّق مرة واحدة حسب dataVer، وقبلها لقطة كاملة داخل التطبيق (الإعدادات ← النسخ الداخلية)
+     لا تُحذف أي سجلات ولا يُعاد إنشاء القاعدة. الحقول الجديدة اختيارية والقديم يُقرأ كما هو */
+  M.DATA_VER = 2;
+  var MIGRATIONS = {
+    /* ٢: الامتحانات القديمة تحتفظ بمقاس خطها القديم (بكسل). الجديدة بنقاط الطباعة (styleVer 2) — بلا تعديل للسجلات */
+    2: function () { return Promise.resolve(); }
+  };
+  M.migrate = function () {
+    var from = Number(S.settings.dataVer) || 1;
+    if (from >= M.DATA_VER) return Promise.resolve();
+    var hasData = S.exams.length || S.questions.length;
+    var snap = hasData && M.snapshot && M.db.persistent() ? M.snapshot('قبل ترقية البيانات (الإصدار ' + M.VERSION + ')').catch(function (e) { console.warn('snapshot', e); }) : Promise.resolve();
+    return snap.then(function () {
+      var chain = Promise.resolve();
+      for (var v = from + 1; v <= M.DATA_VER; v++) (function (v) { chain = chain.then(function () { return MIGRATIONS[v] && MIGRATIONS[v](); }).then(function () { return M.setSetting('dataVer', v); }); })(v);
+      return chain;
     });
   };
 

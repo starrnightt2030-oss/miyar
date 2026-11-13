@@ -70,13 +70,12 @@
     var c3 = showDoc ? null : (cen.logo2 ? '<div class="c3 logo"><div class="p-logo has big"><img src="' + cen.logo2 + '" alt=""></div></div>' : (cen.logoSide === 'left' && cen.logo ? '<div class="c3 logo"><div class="p-logo has big"><img src="' + cen.logo + '" alt=""></div></div>' : '<div class="c3 logo"></div>'));
     var c1logo = cen.logoSide === 'left' && !showDoc ? '' : logo;
     var docRows = doc
-      ? '<span class="k">اسم الوثيقة</span><span>' + M.esc(doc.name) + '</span>' +
-        '<span class="k">كود الوثيقة</span><span><span class="p-code">' + M.esc(doc.code) + '</span></span>' +
+      ? '<span class="k">كود الوثيقة</span><span><span class="p-code">' + M.esc(doc.code) + '</span></span>' +
         '<span class="k">رقم الإصدار</span><span>' + c.num(doc.version) + '</span>' +
         '<span class="k">تاريخ الإصدار</span><span>' + c.num(M.fmtDate(doc.issueDate)) + '</span>' +
         '<span class="k">رقم التعديل</span><span>' + c.num(doc.revision || '00') + (doc.revisionDate ? ' — ' + c.num(M.fmtDate(doc.revisionDate)) : '') + '</span>' +
         '<span class="k">الصفحة</span><span>' + pageNoPh + '</span>'
-      : '<span class="k">اسم الوثيقة</span><span>—</span><span class="k">كود الوثيقة</span><span>—</span><span class="k">رقم الإصدار</span><span>—</span><span class="k">الصفحة</span><span>' + pageNoPh + '</span>';
+      : '<span class="k">كود الوثيقة</span><span>—</span><span class="k">رقم الإصدار</span><span>—</span><span class="k">الصفحة</span><span>' + pageNoPh + '</span>';
     return '<div class="pblock p-head' + (showDoc ? '' : ' nodoc') + '">' +
       '<div class="c1">' + c1logo + nameBlock + '</div>' +
       '<div class="c2"><span class="t1">' + c.T(e.title || 'امتحان') + (e.model ? ' — نموذج (' + c.T(e.model) + ')' : '') + '</span>' +
@@ -292,14 +291,66 @@
     return '<div class="pblock p-mini"><span>' + c.T(e.title || '') + ' — مادة ' + c.T(M.examSubject(e)) + (e.model ? ' — نموذج (' + c.T(e.model) + ')' : '') + '</span><span>تابع الأسئلة</span></div>';
   }
 
+  /* ===== الخط =====
+     الامتحانات من الإصدار ٢٫١ (styleVer 2): الحجم بنقاط الطباعة الحقيقية (الصفحة 794px = 210mm بالضبط، فـ 1pt = 1.333px)
+     القديمة: بالبكسل كما كانت (14px ≈ 10.5pt مطبوعة) ولا تتغير إلا باختيار المستخدم */
+  M.TYPO = { normal: { name: 'عادي', pt: 14 }, comfort: { name: 'مريح', pt: 15 }, large: { name: 'خط كبير', pt: 18 } };
+  M.typo = function (e) {
+    e = e || {};
+    if (Number(e.styleVer) >= 2) {
+      var t = M.TYPO[e.typo] ? e.typo : 'normal';
+      var pt = Math.max(11, Math.min(24, Number(e.fontPt) || M.TYPO[t].pt));
+      return { v2: true, typo: t, pt: pt };
+    }
+    var px = e.largePrint ? 18 : e.compact ? 12.5 : (Number(e.fontSize) || 14);
+    return { v2: false, typo: e.largePrint ? 'large' : 'normal', pt: Math.round(px * 0.75 * 10) / 10, px: px };
+  };
+  /* تحويل امتحان قديم للنمط الجديد (باختيار المستخدم) */
+  M.applyNewTypo = function (e) {
+    var t = e.largePrint ? 'large' : 'normal';
+    e.styleVer = 2; e.typo = t; e.fontPt = M.TYPO[t].pt;
+    e.compact = false; e.largePrint = false;
+    return e;
+  };
+
+  /* قوالب الأبيض والأسود */
+  M.BW_THEMES = ['official', 'academic', 'economy', 'comfort'];
+
+  /* تقسيم فرع أطول من صفحة كاملة: ينقل ما يتجاوز حد الصفحة (سطور الإجابة، الاختيارات، الفقرات…) لصفحة جديدة
+     بدل قصّه. العناصر غير القابلة للتقسيم (سطر نص، صورة، معادلة) تنتقل كاملة */
+  function isAtomic(el) {
+    if (!el.children.length) return true;
+    if (el.matches('.st,img,.p-draw,.p-fig,.p-infig,.p-inwrap,.m,.p-term,.p-bank,.p-sec-h,.p-part-h,.p-fside,.p-mcq>.p-item')) return true;
+    var d = getComputedStyle(el).display;
+    return d.indexOf('inline') === 0;
+  }
+  function fragment(el, limit) {
+    var kids = Array.prototype.slice.call(el.children), clone = null;
+    for (var i = 0; i < kids.length; i++) {
+      var k = kids[i], r = k.getBoundingClientRect();
+      if (r.bottom <= limit + 0.5) continue;
+      var moveFrom = -1, sub = null;
+      if (r.top >= limit - 1 && i > 0) moveFrom = i;
+      else if (!isAtomic(k)) { sub = fragment(k, limit); moveFrom = sub ? i + 1 : (i > 0 ? i : -1); }
+      else if (i > 0) moveFrom = i;
+      if (moveFrom < 0 && !sub) return null;
+      clone = el.cloneNode(false); clone.removeAttribute('id');
+      if (sub) clone.appendChild(sub);
+      if (moveFrom >= 0) for (var j = moveFrom; j < kids.length; j++) clone.appendChild(kids[j]);
+      return clone;
+    }
+    return null;
+  }
+
   function pageShell(c) {
-    var e = c.exam;
-    var cls = 'page' + (c.en ? ' ltr' : '') + (e.compact && !e.largePrint ? ' compact' : '') + (e.largePrint ? ' large' : '') + (e.separator === 'dashed' ? ' sep-dashed' : '') + (e.boldText ? ' bold-all' : '') + ' th-' + (e.theme || 'classic');
-    var style = '--pc:' + (e.color || '#1F2A44') + ';' + (e.compact || e.largePrint ? '' : '--pfs:' + (Number(e.fontSize) || 14) + 'px;') +
+    var e = c.exam, ty = M.typo(e);
+    var cls = 'page' + (c.en ? ' ltr' : '') + (!ty.v2 && e.compact && !e.largePrint ? ' compact' : '') + (!ty.v2 && e.largePrint ? ' large' : '') + (ty.v2 ? ' v2 ty-' + ty.typo : '') + (e.separator === 'dashed' ? ' sep-dashed' : '') + (e.boldText ? ' bold-all' : '') + ' th-' + (e.theme || 'classic') + (M.BW_THEMES.indexOf(e.theme) >= 0 ? ' bw' : '');
+    var style = '--pc:' + (e.color || '#1F2A44') + ';' + (ty.v2 ? '--pfs:' + ty.pt + 'pt;' : (e.compact || e.largePrint ? '' : '--pfs:' + (Number(e.fontSize) || 14) + 'px;')) +
       (e.font ? '--pfont:' + e.font + ';' : '');
     var el = document.createElement('div');
     el.className = cls; el.setAttribute('style', style);
-    el.innerHTML = '<div class="pg-body"></div><div class="p-cont"></div>' + footHTML(c);
+    /* سطر «تابع» محجوز أثناء القياس حتى لا يقتطع من مساحة الأسئلة بعد التقسيم */
+    el.innerHTML = '<div class="pg-body"></div><div class="p-cont">' + (c.en ? 'Please turn over →' : 'تابع الأسئلة في الصفحة التالية ←') + '</div>' + footHTML(c);
     return el;
   }
 
@@ -326,6 +377,20 @@
     function addHTML(html) {
       var tmp = document.createElement('div'); tmp.innerHTML = html;
       var el = tmp.firstElementChild; body.appendChild(el); return el;
+    }
+    var LONG = ['essay', 'reason', 'problem'];
+    function limitOf(b) { return b.getBoundingClientRect().top + b.clientHeight; }
+    function freeSpace() { var last = body.lastElementChild; return last ? limitOf(body) - last.getBoundingClientRect().bottom : body.clientHeight; }
+    /* يبدأ الفرع في الصفحة الحالية فقط إذا ظهر عنوان السؤال ونص الفرع وسطران على الأقل */
+    function startsHere(html) {
+      var el = addHTML(html), lim = limitOf(body);
+      var st = el.querySelector('.p-item .st'), ln = el.querySelectorAll('.p-lines i, .p-ansg');
+      var ok = st && st.getBoundingClientRect().bottom <= lim && ln.length >= 2 && ln[1].getBoundingClientRect().bottom <= lim;
+      if (!ok) { el.remove(); return false; }
+      var probe = fragment(el, lim);
+      if (!probe) { el.remove(); return false; }
+      /* أعِد ما نُقل حتى يقسمه المسار المعتاد */
+      el.remove(); addHTML(html); return true;
     }
     newPage();
     addHTML(headerHTML(c, '<b data-pn></b>&nbsp;من&nbsp;<b data-pt></b>'));
@@ -359,11 +424,16 @@
           addHTML(sectionHTML(c, sec, idx, from, best, cont));
           from = best;
           newPage();
-        } else if (onlyHead) {
-          /* عنصر واحد أطول من صفحة كاملة: يوضع كما هو */
-          addHTML(sectionHTML(c, sec, idx, from, from + 1, cont));
+        } else if (onlyHead || (LONG.indexOf(sec.type) >= 0 && freeSpace() > body.clientHeight * 0.3 && startsHere(sectionHTML(c, sec, idx, from, from + 1, cont)))) {
+          /* فرع طويل (سطور إجابة كثيرة) أو أطول من صفحة: يبدأ هنا ويُكمل في الصفحة التالية بدل ترك فراغ أو إخفاء جزء منه */
+          var big = onlyHead ? addHTML(sectionHTML(c, sec, idx, from, from + 1, cont)) : body.lastElementChild, guard = 0;
+          while (overflow(body) && guard++ < 20) {
+            var rem = fragment(big, limitOf(body));
+            if (!rem) break;
+            rem.insertAdjacentHTML('afterbegin', '<div class="p-frag">' + (c.en ? '(continued)' : '(تابع)') + '</div>');
+            newPage(); body.appendChild(rem); big = rem;
+          }
           from += 1;
-          if (from < n) newPage();
         } else {
           newPage();
         }

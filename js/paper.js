@@ -161,7 +161,7 @@
     var words = [];
     sec.items.forEach(function (it) {
       var q = M.examQ(exam, it.qid); if (!q) return;
-      (String(q.text).match(/\[\[(.+?)\]\]/g) || []).forEach(function (m) { words.push(m.slice(2, -2)); });
+      (String(q.text).match(/\[\[(.+?)\]\]/g) || []).forEach(function (m) { var w = m.slice(2, -2); if (w.trim() && w !== M.BLANK_UNKNOWN) words.push(w); });
       (q.extras || []).forEach(function (x) { if (String(x).trim()) words.push(x); });
     });
     return M.shuffle(words, M.rng(seedFor(exam, 'bank' + sec.id)));
@@ -275,7 +275,8 @@
   function sectionHTML(c, sec, idx, from, to, cont) {
     var head = (from === 0 || cont) ? secHeadHTML(c, sec, idx, cont && from > 0) : '';
     var sep = sec.sep || c.exam.itemSep || 'space';
-    return '<div class="pblock p-sec sep-' + sep + '" data-sec="' + idx + '">' + head + itemsHTML(c, sec, from, to) + '</div>';
+    var pass = from === 0 && sec.passage ? '<div class="p-passage">' + c.rich(sec.passage) + '</div>' : '';
+    return '<div class="pblock p-sec sep-' + sep + '" data-sec="' + idx + '">' + head + pass + itemsHTML(c, sec, from, to) + '</div>';
   }
 
   function footHTML(c) {
@@ -466,7 +467,8 @@
     exam.sections.forEach(function (sec, idx) {
       var inf = c.si.info[idx];
       h += '<div class="pblock k-sec"><h4>السؤال ' + M.ordinal(inf.main) + (inf.hasParts ? ' (' + M.partLabel(exam, inf.part) + ')' : '') + ': ' + c.T(sec.title || M.TYPE[sec.type].title) + ' (' + c.T(M.gradeWord(M.sectionGrade(exam, sec))) + ')</h4>';
-      if (sec.type === 'match') {
+      if (sec.type === 'match' && sec.items.some(function (it) { var mq = M.examQ(exam, it.qid); return mq && mq.matchUnknown; })) h += '<div class="k-row"><b class="k-none">الربط الصحيح غير محدد</b></div>';
+      else if (sec.type === 'match') {
         var ml = M.matchLayout(exam, sec);
         ml.A.forEach(function (p, i) {
           var j = ml.B.findIndex(function (b) { return b.pair === p; });
@@ -476,11 +478,14 @@
         sec.items.forEach(function (it, i) {
           var q = M.examQ(exam, it.qid); if (!q) return;
           var ans;
-          if (q.type === 'mcq') {
-            var order = M.mcqOrder(exam, sec, q);
-            var pos = order.indexOf(Number(q.correct));
-            ans = c.L[pos] + ') ' + c.rich(q.options[q.correct]);
-          } else ans = M.richText(M.answerText(q), c.mode, { answers: true });
+          if (!M.hasAnswer || M.hasAnswer(q) || !M.answerRequired(q)) {
+            if (q.type === 'mcq') {
+              var order = M.mcqOrder(exam, sec, q);
+              var pos = order.indexOf(Number(q.correct));
+              ans = c.L[pos] + ') ' + c.rich(q.options[q.correct]);
+            } else ans = M.richText(M.answerText(q), c.mode, { answers: true });
+            if (q.ans === 'ai') ans += ' <i class="k-ai">(مقترحة — غير مؤكدة)</i>';
+          } else ans = '<b class="k-none">الإجابة غير محددة</b>';
           h += '<div class="k-row"><span>' + c.num(i + 1) + ')</span><span>' + ans + '</span><span class="g">' + c.T(M.gradeWord(M.itemGrade(exam, it))) + '</span></div>';
         });
       }

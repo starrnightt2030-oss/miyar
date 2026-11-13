@@ -14,12 +14,16 @@
     DATA_STORES.forEach(function (s) {
       data[s] = S[s].slice();
     });
+    if (kind === 'backup' && !opts.noSources) return M.db.all('sources').catch(function () { return []; }).then(function (src) { data.sources = src; return finishPack(kind, data); });
+    return finishPack(kind, data);
+  };
+  function finishPack(kind, data) {
     if (kind === 'backup') { data.docs = S.docs; data.log = S.log; data.packs = S.packs; data.settings = {}; Object.keys(S.settings).forEach(function (k) { if (['folderHandle', 'aiKey', 'aiKeys', 'cloudSession', 'bio'].indexOf(k) < 0) data.settings[k] = S.settings[k]; }); }
     var payload = JSON.stringify(data);
     return M.hash(payload).then(function (h) {
       return JSON.stringify({ format: 'miyar-pack', v: 1, kind: kind, createdAt: M.now(), from: { deviceId: S.settings.deviceId, name: M.me().name, role: M.role(), center: (S.settings.center || {}).name || '' }, hash: h, data: data });
     });
-  };
+  }
 
   M.exportPack = function () {
     return M.buildPack('teacher').then(function (txt) {
@@ -99,6 +103,8 @@
   M.restore = function (p) {
     if (p.kind !== 'backup') return Promise.reject(new Error('هذا الملف حزمة مدرس وليس نسخة احتياطية — استخدم «دمج الحزم»'));
     var stores = DATA_STORES.concat(['docs', 'log', 'packs']);
+    /* صفحات المصادر: تُستعاد إن وُجدت في النسخة (النسخ الأقدم لا تحتويها فتبقى الموجودة) */
+    if (Array.isArray(p.data.sources)) stores.push('sources');
     return Promise.all(stores.map(function (s) { return M.db.clear(s); })).then(function () {
       return Promise.all(stores.map(function (s) { return M.db.putMany(s, p.data[s] || []); }));
     }).then(function () {

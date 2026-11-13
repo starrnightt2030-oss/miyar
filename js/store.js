@@ -224,8 +224,8 @@
   /* نص الإجابة الصحيحة للمفتاح */
   M.answerText = function (q) {
     switch (q.type) {
-      case 'mcq': return (M.AR_LETTERS[q.correct] || '') + ') ' + (q.options[q.correct] || '');
-      case 'tf': return q.answer ? '✓' : '✗' + (q.correction ? ' — التصويب: ' + q.correction : '');
+      case 'mcq': return q.correct == null ? '' : (M.AR_LETTERS[q.correct] || '') + ') ' + (q.options[q.correct] || '');
+      case 'tf': return q.answer === true ? '✓' : q.answer === false ? '✗' + (q.correction ? ' — التصويب: ' + q.correction : '') : '';
       case 'complete': return (String(q.text).match(/\[\[(.+?)\]\]/g) || []).map(function (m) { return m.slice(2, -2); }).join(' — ');
       case 'term': return q.term;
       case 'match': return '';

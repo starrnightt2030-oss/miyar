@@ -154,6 +154,7 @@
       if (inf.first) out.push(k.para([k.run('السؤال ' + M.ordinal(inf.main) + ': ', { bold: true, size: 13, color: '1F2A44' }), k.run(exam.sections[grp.start].mainTitle || 'أجب عن الأسئلة الآتية:', { bold: true, size: 13 }), k.run('   (' + M.gradeWord(M.groupGrade(exam, grp)) + ')', { bold: true, size: 11 })], { before: 160, after: 60, bottomLine: true, keepNext: true }));
       out.push(k.para([k.run('(' + M.partLabel(exam, inf.part) + ') ', { bold: true, size: 13, color: '1F2A44' }), k.run(title, { bold: true, size: 12 }), k.run('   (' + M.gradeWord(M.sectionGrade(exam, sec)) + ')', { size: 10 })], { before: 80, after: 60, keepNext: true }));
     }
+    if (sec.passage) out.push(k.para(sec.passage, { after: 80, keepNext: true }));
     if (sec.type === 'tf') {
       var rows = sec.items.map(function (it, i) { var q = M.itemQ(exam, it); return [k.cell(String(i + 1), { w: 600, center: true }), k.cell(blankify(q.text), { w: 8666 }), k.cell('(       )', { w: 1200, center: true })]; });
       out.push(k.table(rows, [600, 8666, 1200]));
@@ -254,12 +255,14 @@
       var ki = KS.info[idx];
       kids.push(k.para('السؤال ' + M.ordinal(ki.main) + (ki.hasParts ? ' (' + M.partLabel(exam, ki.part) + ')' : '') + ': ' + (sec.title || M.TYPE[sec.type].title) + ' (' + M.gradeWord(M.sectionGrade(exam, sec)) + ')', { bold: true, before: 120, bottomLine: true }));
       var rows = [];
-      if (sec.type === 'match') {
+      var unknownMatch = sec.type === 'match' && sec.items.some(function (it) { var mq = M.examQ(exam, it.qid); return mq && mq.matchUnknown; });
+      if (unknownMatch) rows.push([k.cell('', { w: 700 }), k.cell('الربط الصحيح غير محدد', { w: 8266, bold: true }), k.cell('', { w: 1500 })]);
+      else if (sec.type === 'match') {
         var ml = M.matchLayout(exam, sec);
         ml.A.forEach(function (p, i) { var j = ml.B.findIndex(function (b) { return b.pair === p; }); rows.push([k.cell(String(i + 1), { w: 700, center: true }), k.cell(p.a + ' ← (' + L[j] + ') ' + p.b, { w: 8266 }), k.cell('', { w: 1500 })]); });
       } else sec.items.forEach(function (it, i) {
         var q = M.examQ(exam, it.qid); if (!q) return;
-        var a = q.type === 'mcq' ? L[M.mcqOrder(exam, sec, q).indexOf(Number(q.correct))] + ') ' + q.options[q.correct] : M.answerText(q);
+        var a = M.answerRequired(q) && !M.hasAnswer(q) ? 'الإجابة غير محددة' : (q.type === 'mcq' ? L[M.mcqOrder(exam, sec, q).indexOf(Number(q.correct))] + ') ' + q.options[q.correct] : M.answerText(q)) + (q.ans === 'ai' ? ' (مقترحة — غير مؤكدة)' : '');
         rows.push([k.cell(String(i + 1), { w: 700, center: true }), k.cell(String(a).split('\n').map(function (ln) { return k.para(ln, { after: 0 }); }), { w: 8266 }), k.cell(M.gradeWord(M.itemGrade(exam, it)), { w: 1500, center: true })]);
       });
       if (rows.length) kids.push(k.table(rows, [700, 8266, 1500]));

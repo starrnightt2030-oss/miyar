@@ -20,15 +20,16 @@
     return s + (qs ? '?' + qs : '');
   };
 
-  /* الإصدار ٢: التطبيق يركّز على تصميم الامتحانات يدوياً — بنك الأسئلة «قريباً» */
+  /* الإصدار ٢٫٢: مكتبتا الأسئلة (المستخرجة والمولدة) — بنك الإصدار الأول القديم يبقى محفوظاً ومخفياً */
   function navItems() {
     return [
       { k: 'home', label: 'الرئيسية', icon: 'home' },
       { k: 'exams', label: 'امتحاناتي', icon: 'exam' },
       { k: 'identity', label: 'هوية المؤسسة', icon: 'grid' },
       { k: 'docs', label: 'وثائق الجودة', icon: 'docs' },
-      { k: 'settings', label: 'الإعدادات', icon: 'settings' },
-      { k: 'soon', label: 'بنك الأسئلة', icon: 'bank', soon: true }
+      { k: 'library', label: 'الأسئلة المستخرجة', icon: 'bank' },
+      { k: 'library-ai', label: 'الأسئلة المولدة', icon: 'spark' },
+      { k: 'settings', label: 'الإعدادات', icon: 'settings' }
     ];
   }
   /* توقيع المطوّر */
@@ -43,8 +44,8 @@
     var nav = items.map(function (it) {
       return '<a href="#/' + it.k + '" class="' + (it.k === active ? 'on' : '') + (it.soon ? ' soon' : '') + '">' + I(it.icon) + '<span>' + it.label + '</span>' + (it.soon ? '<span class="soon-b">قريباً</span>' : '') + '</a>';
     }).join('');
-    var mob = items.filter(function (it) { return ['home', 'exams', 'identity', 'settings'].indexOf(it.k) >= 0; }).map(function (it) {
-      return '<a href="#/' + it.k + '" class="' + (it.k === active ? 'on' : '') + '">' + I(it.icon, 22) + '<span>' + ({ home: 'الرئيسية', exams: 'امتحاناتي', identity: 'الهوية', settings: 'الإعدادات' })[it.k] + '</span></a>';
+    var mob = items.filter(function (it) { return ['home', 'exams', 'library', 'identity', 'settings'].indexOf(it.k) >= 0; }).map(function (it) {
+      return '<a href="#/' + it.k + '" class="' + (it.k === active || (it.k === 'library' && active === 'library-ai') ? 'on' : '') + '">' + I(it.icon, 22) + '<span>' + ({ home: 'الرئيسية', exams: 'امتحاناتي', library: 'المكتبة', identity: 'الهوية', settings: 'الإعدادات' })[it.k] + '</span></a>';
     }).join('');
     var cen = S.settings.center || {};
     return '<div class="app"><aside class="side"><div class="brand">' + '<img class="brand-logo" src="icons/icon-192.png" alt="Exam Studio">' + '<div><b>Exam Studio</b><span>' + esc(cen.name || 'استوديو الامتحانات') + '</span></div></div>' +
@@ -164,23 +165,27 @@
     var idDone = [!!cen.logo, !!cen.name, !!M.docFor('exam')].filter(Boolean).length;
     main.innerHTML = '<div class="content home">' +
       '<section class="hero2"><div class="h2-t"><span>' + greet + '،</span><h1>' + esc(me.name || '') + '</h1><p>صمّم امتحانك بنفسك: اختر نوع كل سؤال واكتبه، وشاهد الورقة تتنسّق أمامك لحظة بلحظة.</p>' +
-      '<div class="row"><button class="btn pri lg" id="h-newexam">' + I('plus') + ' امتحان جديد</button><button class="btn lg ghost-w" id="h-import">' + I('spark') + ' استيراد أسئلة مكتوبة أو مصوّرة</button></div></div>' +
+      '<div class="row"><button class="btn pri lg" id="h-newexam">' + I('plus') + ' امتحان جديد</button><a class="btn lg ghost-w" href="#/extract">' + I('file') + ' استخراج أسئلة من ملف أو صور</a><a class="btn lg ghost-w" href="#/generate">' + I('spark') + ' توليد أسئلة من محتوى</a></div></div>' +
       '<div class="h2-art" aria-hidden="true"><div class="mini-paper"><i class="mp-h"></i><i class="mp-l w70"></i><i class="mp-s"></i><i class="mp-l"></i><i class="mp-l w80"></i><i class="mp-o"></i><i class="mp-s"></i><i class="mp-l w60"></i><i class="mp-f"></i></div></div></section>' +
       M.safetyBanner() + '<div id="h-folderbar"></div>' +
       (!M.db.persistent() ? '<div class="alert bad">' + I('warn') + '<div>المتصفح لا يسمح بالحفظ الدائم في هذا الوضع (مثل التصفح الخاص) — البيانات ستضيع عند الإغلاق.</div></div>' : '') +
       (days > 7 && exams.length ? '<div class="alert warn">' + I('warn') + '<div style="flex:1">' + (lastB ? 'آخر نسخة احتياطية منذ ' + n(Math.floor(days)) + ' يوماً.' : 'لم تُؤخذ نسخة احتياطية بعد.') + ' خذ نسخة الآن واحفظها خارج الجهاز.</div><button class="btn sm" id="h-backup">نسخة احتياطية</button></div>' : '') +
-      (idDone < 3 ? '<a class="id-cta" href="#/identity"><span class="ic">' + I('grid', 22) + '</span><div><b>أكمل هوية المؤسسة (' + n(idDone) + ' من ٣)</b><span>الشعار وبيانات الترويسة ووثيقة الجودة — تظهر تلقائياً في كل امتحان</span></div><span class="go">' + I('back', 18) + '</span></a>' : '') +
+      '<div id="h-jobs"></div>' + (idDone < 3 ? '<a class="id-cta" href="#/identity"><span class="ic">' + I('grid', 22) + '</span><div><b>أكمل هوية المؤسسة (' + n(idDone) + ' من ٣)</b><span>الشعار وبيانات الترويسة ووثيقة الجودة — تظهر تلقائياً في كل امتحان</span></div><span class="go">' + I('back', 18) + '</span></a>' : '') +
       '<div class="card flat"><div class="card-h" style="padding:14px 16px 6px"><h2 class="grow">آخر الامتحانات</h2><a class="btn sm ghost" href="#/exams">الكل</a></div>' +
       (exams.length ? '<div class="ex-grid">' + exams.slice(0, 6).map(function (e) { return M.examCard(e); }).join('') + '</div>'
         : '<div style="padding:4px 16px 18px"><div class="empty">لا توجد امتحانات بعد — اضغط «امتحان جديد».</div></div>') + '</div></div>';
     var hb = M.qs('#h-backup', main); if (hb) hb.onclick = function () { M.backup(); };
     M.qs('#h-newexam', main).onclick = function () { M.newExamWizard(); };
-    M.qs('#h-import', main).onclick = function () { M.newExamWizard('import'); };
     M.bindExamCards && M.bindExamCards(main);
     M.bindSafety(main);
+    if (M.extractJobs) M.extractJobs().then(function (js) { var box = M.qs('#h-jobs', main); if (!box || !js.length) return; box.innerHTML = '<div class="alert info">' + I('file') + '<div style="flex:1">لديك ' + n(js.length) + ' مهمة استخراج غير مكتملة — نتائجها محفوظة على الجهاز.</div>' + js.slice(0, 3).map(function (j) { return '<a class="btn sm" href="#/extract/' + j.id + '">' + esc((j.sources || []).map(function (x) { return x.name; }).join('، ').slice(0, 40) || 'مهمة') + '</a>'; }).join('') + '</div>'; });
     M.folderReconnectBar().then(function (h) { var fb = M.qs('#h-folderbar', main); if (fb && h) { fb.innerHTML = h; M.bindSafety(fb); } });
   };
 
+  /* توليد الأسئلة: المرحلة القادمة */
+  if (!M.views.generate) M.views.generate = function (main) {
+    main.innerHTML = '<div class="content"><div class="soon-page"><span class="ic">' + I('spark', 40) + '</span><span class="chip info">قريباً</span><h1>توليد أسئلة من محتوى</h1><p>المرحلة القادمة: ترفع جزءاً من درس فيولّد أسئلة جديدة مبنية عليه، بإجابات ومراجعة قبل الحفظ.</p><a class="btn pri" href="#/extract">' + I('file') + ' استخراج أسئلة موجودة من ملف أو صور</a></div></div>';
+  };
   /* قريباً: بنك الأسئلة */
   M.views.soon = function (main) {
     main.innerHTML = '<div class="content"><div class="soon-page"><span class="ic">' + I('bank', 40) + '</span><span class="chip info">قريباً</span><h1>بنك الأسئلة</h1>' +

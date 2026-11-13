@@ -28,7 +28,8 @@
       '- parts: أجزاء السؤال الرئيسي (أ)، (ب)… وإن لم تكن له أجزاء فجزء واحد. title: سطر التعليمات كما هو (مثل «اختر الإجابة الصحيحة مما بين القوسين»). type: نوع فروع هذا الجزء.\n' +
       '- الأنواع: mcq اختيار من متعدد · tf صح وخطأ · complete أكمل · match توصيل · term مصطلح علمي · reason علّل · essay مقالي/اذكر/عرّف/قارن · draw ارسم · problem مسألة حسابية.\n' +
       '- لكل فرع: text نص الفرع بدون رقمه. mcq: options الاختيارات بدون الحروف، وcorrect رقم الصحيح من 0. tf: answer وcorrection تصويب الخطأ. complete: ضع الإجابة مكان الفراغ بين [[ و ]]. match: pairs كل عنصر من (أ) مع ما يقابله صحيحاً من (ب)، وextras البدائل الزائدة. term: text التعريف وterm المصطلح. reason/essay/problem/draw: modelAnswer إجابة نموذجية مختصرة، وlines عدد سطور مناسب للإجابة.\n' +
-      '- الإجابات: إذا كانت موجودة في المصدر استخدمها وsure=true. إن لم تكن موجودة استنتج الإجابة العلمية الصحيحة وsure=false.\n' +
+      '- الإجابات: إذا كانت موجودة في المصدر استخدمها وsure=true. إن لم تكن موجودة فلا تستنتجها: sure=false واترك الإجابة فارغة (correct=-1، وفي أكمل اكتب [[؟]] مكان الفراغ).\n' +
+      '- الكلمات غير المقروءة لا تخمّنها: اكتب مكانها ⟦؟⟧.\n' +
       '- grade: درجة الفرع إن كانت مكتوبة (وإن كُتبت درجة السؤال كله فقسّمها على فروعه)، وإلا 0.\n' +
       '- المعادلات بصيغة $...$ (مثل $\\frac{1}{2}$ و $س^{2}$)، والأرقام كما في المصدر.\n' +
       '- الحقول غير المستخدمة: نص فارغ "" أو قائمة فارغة [] أو 0 أو false.\n' +
@@ -40,7 +41,7 @@
   function toQuestion(x, type) {
     var q = M.newQuestion(type, ''); q.subjectId = ''; q.source = 'ai-import'; q.solLines = 0;
     q.text = String(x.text || '').trim();
-    if (type === 'mcq') { q.options = (x.options || []).map(String).filter(function (o) { return o.trim(); }).slice(0, 6); while (q.options.length < 2) q.options.push(''); q.correct = Math.max(0, Math.min(q.options.length - 1, Number(x.correct) || 0)); }
+    if (type === 'mcq') { q.options = (x.options || []).map(String).filter(function (o) { return o.trim(); }).slice(0, 6); while (q.options.length < 2) q.options.push(''); q.correct = Number(x.correct) >= 0 && Number(x.correct) < q.options.length ? Number(x.correct) : null; }
     if (type === 'tf') { q.answer = x.answer !== false; q.correction = x.correction || ''; }
     if (type === 'match') { q.pairs = (x.pairs || []).filter(function (p) { return p && (p.a || p.b); }); if (q.pairs.length < 2) q.pairs.push({ a: '', b: '' }); q.extras = (x.extras || []).filter(Boolean); }
     if (type === 'complete') { q.extras = (x.extras || []).filter(Boolean); if (!/\[\[/.test(q.text)) q.text = q.text.replace(/[.…]{3,}|_{3,}/, '[[……]]'); }
@@ -49,6 +50,17 @@
     q.grade = Number(x.grade) > 0 ? Number(x.grade) : M.TYPE[type].grade;
     if (['reason', 'essay', 'problem'].indexOf(type) >= 0 && Number(x.lines) > 0) q.lines = Math.min(15, Number(x.lines));
     q._sure = x.sure !== false;
+    /* بلا إجابة في المصدر: تبقى «غير محددة» — لا قيمة افتراضية تتحول لإجابة معتمدة */
+    if (!q._sure) {
+      if (type === 'mcq') q.correct = null;
+      if (type === 'tf') { q.answer = null; q.correction = ''; }
+      if (type === 'term') q.term = '';
+      if (type === 'complete') q.text = q.text.replace(/\[\[(.*?)\]\]/g, '[[' + M.BLANK_UNKNOWN + ']]');
+      if (type === 'match') q.matchUnknown = true;
+      q.modelAnswer = '';
+    }
+    q.ans = M.hasAnswer(q) ? 'source' : 'none';
+    q.unclear = q.text.indexOf(M.UNCLEAR) >= 0;
     return q;
   }
   function cropFigure(q, x, images) {
@@ -157,7 +169,7 @@
             (q.type === 'mcq' ? '<span class="small">' + q.options.map(function (o, i) { return i === q.correct ? '<b class="ok">' + esc(o) + ' ✓</b>' : esc(o); }).join(' · ') + '</span>' : '') +
             (q.type === 'tf' ? '<span class="small"><b class="ok">' + (q.answer ? 'صح' : 'خطأ' + (q.correction ? ' — ' + esc(q.correction) : '')) + '</b></span>' : '') +
             (q.figure ? '<span class="imp-fig"><img src="' + q.figure + '" alt="الرسمة"><span class="small">قُصّت الرسمة من الصورة — تقدر تعدّل القص بعد الإضافة</span></span>' : '') +
-            (!q._sure ? '<span class="small warn-t">الإجابة مستنتجة — راجعها</span>' : '') + '</span><span class="g">' + n(q.grade) + '</span></label>';
+            (!q._sure ? '<span class="small warn-t">الإجابة غير موجودة في المصدر — تبقى «غير محددة» حتى تكتبها</span>' : '') + '</span><span class="g">' + n(q.grade) + '</span></label>';
         });
       });
       h += '</div>';

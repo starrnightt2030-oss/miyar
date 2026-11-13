@@ -1,5 +1,5 @@
 /* معيار — Service Worker (مولَّد تلقائياً بواسطة tools/release.js — لا تعدّله يدوياً) */
-var VERSION = '2.1.1';
+var VERSION = '2.2.0';
 var CACHE = 'miyar-' + VERSION;
 var FILES = [
   "./config.json",
@@ -33,16 +33,20 @@ var FILES = [
   "./js/db.js",
   "./js/draw.js",
   "./js/exchange.js",
+  "./js/extract.js",
   "./js/generator.js",
   "./js/identity.js",
   "./js/imgtools.js",
   "./js/import.js",
   "./js/install.js",
+  "./js/libcore.js",
+  "./js/library.js",
   "./js/math.js",
   "./js/paper.js",
   "./js/pdf.js",
   "./js/safety.js",
   "./js/sound.js",
+  "./js/sources.js",
   "./js/store.js",
   "./js/studio.js",
   "./js/update.js",
@@ -51,6 +55,9 @@ var FILES = [
   "./js/vendor/LICENSE-jspdf",
   "./js/vendor/html-to-image.js",
   "./js/vendor/jspdf.umd.min.js",
+  "./js/vendor/pdfjs/LICENSE",
+  "./js/vendor/pdfjs/pdf.min.js",
+  "./js/vendor/pdfjs/pdf.worker.min.js",
   "./js/version.js",
   "./js/views-admin.js",
   "./js/views-bank.js",
@@ -60,6 +67,13 @@ var FILES = [
   "./vendor/docx.umd.js",
   "./vendor/supabase.js",
   "./vendor/xlsx.full.min.js",
+  "./x/ex-progress.png",
+  "./x/ex-review.png",
+  "./x/ex-setup.png",
+  "./x/ex2-review.png",
+  "./x/ex2-setup.png",
+  "./x/lib.png",
+  "./x/src-preview.png",
   "./"
 ];
 

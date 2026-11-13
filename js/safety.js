@@ -21,7 +21,8 @@
 
   /* ===== النسخ الداخلية (لقطات) ===== */
   M.snapshot = function (reason) {
-    return M.buildPack('backup').then(function (txt) {
+    /* اللقطات الداخلية بدون صور صفحات المصادر (حجمها كبير وهي لا تتغير) — النسخة الاحتياطية الكاملة تحتويها */
+    return M.buildPack('backup', { noSources: true }).then(function (txt) {
       var rec = { id: M.uid(), at: M.now(), reason: reason || 'يدوية', size: txt.length, by: M.me().name || '', version: M.VERSION, questions: S.questions.length, text: txt };
       return M.db.put('snapshots', rec).then(function () { return M.db.all('snapshots'); }).then(function (all) {
         all.sort(function (a, b) { return a.at < b.at ? 1 : -1; });

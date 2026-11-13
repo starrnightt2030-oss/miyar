@@ -409,3 +409,8 @@ u.ans{text-decoration:none;border-bottom:1.5px solid #1D4ED8;color:#1E3A8A;paddi
 
 .p-cont .p-end{margin-top:0}
 .v2 .p-sec .p-item:last-child{margin-bottom:0!important}
+/* القطعة المشتركة لأسئلة السؤال الرئيسي */
+.p-passage{border:1px solid #9CA3AF;border-radius:4px;padding:4px 10px;margin:2px 0 4px;text-align:justify}
+.bw .p-passage{border-color:#000}
+.k-none{color:#9B1C1C}.bw .k-none{color:#000;text-decoration:underline}
+.k-ai{font-size:.85em;color:#8A4108}

@@ -1,7 +1,7 @@
 /* طبقة التخزين — IndexedDB على الجهاز */
 (function (M) {
   'use strict';
-  var DB_NAME = 'miyar', DB_VER = 3;
+  var DB_NAME = 'miyar', DB_VER = 4;
   M.STORES = ['subjects', 'units', 'lessons', 'outcomes', 'questions', 'exams', 'docs', 'log', 'packs'];
   var dbp = null, memory = null;
 
@@ -17,6 +17,9 @@
         M.STORES.forEach(function (s) { if (!db.objectStoreNames.contains(s)) db.createObjectStore(s, { keyPath: 'id' }); });
         if (!db.objectStoreNames.contains('snapshots')) db.createObjectStore('snapshots', { keyPath: 'id' });
         if (!db.objectStoreNames.contains('conflicts')) db.createObjectStore('conflicts', { keyPath: 'id' });
+        /* الإصدار ٤ (2.2): صفحات المصادر المستخرج منها (معاينة) + مهام الاستخراج الجارية — إضافة فقط، بلا مساس بالموجود */
+        if (!db.objectStoreNames.contains('sources')) db.createObjectStore('sources', { keyPath: 'id' });
+        if (!db.objectStoreNames.contains('jobs')) db.createObjectStore('jobs', { keyPath: 'id' });
       };
       req.onsuccess = function () {
         var db = req.result;
@@ -73,6 +76,9 @@
         list.forEach(function (o) { if (!os) mem[o.id] = o; else os.put(o); });
         return list.length;
       });
+    },
+    get: function (store, key) {
+      return tx(store, 'readonly', function (os, mem) { if (!os) return { result: mem[key] }; return os.get(key); }).then(function (r) { return r && typeof r === 'object' && 'result' in r ? r.result : r; });
     },
     del: function (store, key) {
       return tx(store, 'readwrite', function (os, mem) { if (!os) { delete mem[key]; return true; } os.delete(key); return true; });

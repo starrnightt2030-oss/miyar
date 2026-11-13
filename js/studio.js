@@ -65,6 +65,7 @@
     var paperSoon = M.debounce(function () { renderPaper(); }, 160);
     /* كل تعديل يمر من هنا */
     function touch(redrawPane) {
+      if (e.status === 'approved') { e.status = 'draft'; e.approvedAt = null; M.toast('أُلغي اعتماد الامتحان لأنه تعدّل — اعتمده من جديد من «المراجعة» بعد الانتهاء', 'bad'); redrawPane = true; }
       recordHist(); saveState('جارٍ الحفظ…'); persist(); paperSoon();
       if (redrawPane) drawPane();
       updUndo();
@@ -143,7 +144,9 @@
         h += '<button type="button" class="ol-add part" data-addpart="' + g.start + '">+ جزء (' + M.partLabel(e, g.secs.length) + ') لهذا السؤال</button></div>';
       });
       h += '<button type="button" class="btn pri lg ol-new" id="ol-new">' + I('plus') + ' سؤال رئيسي جديد</button>' +
-        '<button type="button" class="btn ol-ai" id="ol-ai">' + I('spark') + ' استيراد أسئلة جاهزة — نص أو صورة</button></div>';
+        '<button type="button" class="btn ol-ai" id="ol-lib">' + I('bank') + ' إضافة من المكتبة</button>' +
+        '<button type="button" class="btn ol-ai" id="ol-ai">' + I('spark') + ' لصق أسئلة جاهزة — نص أو صورة سريعة</button>' +
+        '<a class="btn ghost ol-ai" href="#/extract">' + I('file') + ' استخراج أسئلة من ملف أو صور (PDF · Word)</a></div>';
       return h;
     }
 
@@ -182,6 +185,12 @@
       var it = itemAt(sel.s, sel.i), q = qOf(it), s = sec(sel.s), t = q.type, si = M.secInfo(e), inf = si.info[sel.s];
       var lbl = 'السؤال ' + M.ordinal(inf.main) + (inf.hasParts ? ' (' + M.partLabel(e, inf.part) + ')' : '') + ' › فرع ' + n(sel.i + 1);
       var h = '<div class="ie">' + crumb(lbl, M.TYPE[t].label);
+      var li = M.libIssues ? M.libIssues(q) : [];
+      if (q.libRef || li.length) h += '<div class="ie-lib">' + (q.libRef ? '<span class="small muted">' + I('bank', 14) + ' منسوخ من ' + esc((M.LIBS[q.libRef.lib] || {}).short ? 'المكتبة ' + M.LIBS[q.libRef.lib].short : 'المكتبة') + ' — نسخة مستقلة لا تتأثر بتعديل المكتبة</span>' : '') +
+        li.map(function (x) { return '<span class="chip ' + x.k + '">' + esc(x.t) + '</span>'; }).join('') +
+        (q.ans === 'ai' && M.hasAnswer(q) ? '<button type="button" class="btn sm" data-ansok>أؤكد أن الإجابة صحيحة</button>' : '') +
+        (q.libReview === 'needs' ? '<button type="button" class="btn sm" data-revok>راجعته — أزل التنبيه</button>' : '') +
+        (M.isUnclear(q) ? '<button type="button" class="btn sm" data-uncok>صححت النص غير الواضح</button>' : '') + '</div>';
       var txtLabel = { mcq: 'نص السؤال', tf: 'العبارة', complete: 'العبارة — الإجابة بين [[ و ]]', match: 'تعليمة إضافية (اختياري)', term: 'العبارة / التعريف', reason: 'المطلوب تعليله', essay: 'نص السؤال', draw: 'نص السؤال', image: 'نص السؤال', problem: 'نص المسألة' }[t];
       h += '<div class="field"><span class="lbl">' + txtLabel + '</span><textarea class="inp paper-font ie-text" data-qk="text" rows="2">' + esc(q.text) + '</textarea>' +
         '<div class="ie-tools"><button type="button" class="btn sm" data-math>∑ معادلة</button>' + (t === 'complete' ? '<button type="button" class="btn sm" data-blank>[[ ]] فراغ للمحدد</button>' : '') +
@@ -189,12 +198,12 @@
         '<div class="symgrid" hidden>' + SYMS.map(function (x) { return '<button type="button" data-sym="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') + '</div></div>';
       if (t === 'mcq') {
         h += '<div class="field"><span class="lbl">الاختيارات — اضغط الحرف لتحديد الإجابة الصحيحة</span><div class="opts">' +
-          q.options.map(function (o, i) { return '<div class="opt' + (Number(q.correct) === i ? ' ok' : '') + '"><button type="button" class="mk" data-correct="' + i + '" aria-label="الإجابة الصحيحة ' + M.AR_LETTERS[i] + '">' + M.AR_LETTERS[i] + (Number(q.correct) === i ? ' ✓' : '') + '</button><input class="inp paper-font" data-opt="' + i + '" value="' + esc(o) + '" aria-label="الاختيار ' + M.AR_LETTERS[i] + '">' + (q.options.length > 2 ? '<button type="button" class="btn icon ghost sm" data-delopt="' + i + '" aria-label="حذف الاختيار">' + I('x', 15) + '</button>' : '') + '</div>'; }).join('') +
+          q.options.map(function (o, i) { return '<div class="opt' + (q.correct != null && Number(q.correct) === i ? ' ok' : '') + '"><button type="button" class="mk" data-correct="' + i + '" aria-label="الإجابة الصحيحة ' + M.AR_LETTERS[i] + '">' + M.AR_LETTERS[i] + (q.correct != null && Number(q.correct) === i ? ' ✓' : '') + '</button><input class="inp paper-font" data-opt="' + i + '" value="' + esc(o) + '" aria-label="الاختيار ' + M.AR_LETTERS[i] + '">' + (q.options.length > 2 ? '<button type="button" class="btn icon ghost sm" data-delopt="' + i + '" aria-label="حذف الاختيار">' + I('x', 15) + '</button>' : '') + '</div>'; }).join('') +
           '</div>' + (q.options.length < 6 ? '<button type="button" class="btn sm ghost" data-addopt style="align-self:flex-start">+ اختيار</button>' : '') + '</div>' +
           field('الاختيارات في السطر (لكل فروع السؤال)', segHTML('sk-cols', [['auto', 'تلقائي'], ['1', '١'], ['2', '٢'], ['4', '٤']], String(s.optCols || 'auto')));
       }
-      if (t === 'tf') h += field('الإجابة', '<div class="seg" id="ie-tf"><button type="button" data-v="1" class="' + (q.answer ? 'on' : '') + '">صح ✓</button><button type="button" data-v="0" class="' + (!q.answer ? 'on' : '') + '">خطأ ✗</button></div>') +
-        (!q.answer ? field('تصويب العبارة', '<input class="inp paper-font" data-qk="correction" value="' + esc(q.correction || '') + '">') : '');
+      if (t === 'tf') h += field('الإجابة', '<div class="seg" id="ie-tf"><button type="button" data-v="1" class="' + (q.answer === true ? 'on' : '') + '">صح ✓</button><button type="button" data-v="0" class="' + (q.answer === false ? 'on' : '') + '">خطأ ✗</button></div>' + (q.answer !== true && q.answer !== false ? '<span class="small bad-t">الإجابة غير محددة</span>' : '')) +
+        (q.answer === false ? field('تصويب العبارة', '<input class="inp paper-font" data-qk="correction" value="' + esc(q.correction || '') + '">') : '');
       if (t === 'match') {
         h += '<div class="field"><span class="lbl">الأزواج: العمود (أ) ← العمود (ب)</span><div class="opts">' + q.pairs.map(function (p, i) { return '<div class="opt"><span class="mk">' + n(i + 1) + '</span><input class="inp paper-font" data-pa="' + i + '" value="' + esc(p.a) + '" aria-label="عنصر أ"><input class="inp paper-font" data-pb="' + i + '" value="' + esc(p.b) + '" aria-label="عنصر ب">' + (q.pairs.length > 2 ? '<button type="button" class="btn icon ghost sm" data-delpair="' + i + '" aria-label="حذف">' + I('x', 15) + '</button>' : '') + '</div>'; }).join('') + '</div><button type="button" class="btn sm ghost" data-addpair style="align-self:flex-start">+ زوج</button></div>';
       }
@@ -224,7 +233,7 @@
       }
       if (['reason', 'essay', 'draw', 'problem', 'term', 'image'].indexOf(t) >= 0) h += field('نموذج الإجابة وتوزيع الدرجات (للمفتاح)', '<textarea class="inp paper-font" data-qk="modelAnswer" rows="2" placeholder="مثال: ١) … (درجة) ٢) … (درجة)">' + esc(q.modelAnswer || '') + '</textarea>');
       if (t === 'mcq') h += field('خطوات الحل في المفتاح (اختياري)', '<textarea class="inp paper-font" data-qk="modelAnswer" rows="2">' + esc(q.modelAnswer || '') + '</textarea>');
-      h += '<div class="ie-acts"><button type="button" class="btn sm" data-iact="up">' + I('up', 16) + '</button><button type="button" class="btn sm" data-iact="down">' + I('down', 16) + '</button><button type="button" class="btn sm" data-iact="dup">' + I('copy', 16) + ' تكرار</button><button type="button" class="btn sm danger" data-iact="del">' + I('trash', 16) + ' حذف</button></div>' +
+      h += '<div class="ie-acts"><button type="button" class="btn sm" data-iact="up">' + I('up', 16) + '</button><button type="button" class="btn sm" data-iact="down">' + I('down', 16) + '</button><button type="button" class="btn sm" data-iact="dup">' + I('copy', 16) + ' تكرار</button><button type="button" class="btn sm" data-iact="lib">' + I('bank', 16) + ' حفظ في المكتبة</button><button type="button" class="btn sm danger" data-iact="del">' + I('trash', 16) + ' حذف</button></div>' +
         '<button type="button" class="btn pri" data-additem="' + sel.s + '" data-after="' + sel.i + '">+ فرع جديد بعده</button></div>';
       return h;
     }
@@ -295,7 +304,8 @@
         if (!s.items.length) out.push({ k: 'warn', t: 'السؤال ' + M.ordinal(M.secInfo(e).info[i].main) + ' بلا فروع', s: i, i: -1 });
         s.items.forEach(function (it, j) {
           var q = M.examQ(e, it.qid); if (!q) return;
-          var errs = M.validateQuestion(q).filter(function (x) { return !/الدرس/.test(x); });
+          var errs = M.validateQuestion(q).filter(function (x) { return !/الدرس/.test(x) && !/حدّد الإجابة الصحيحة|اكتب المصطلح الصحيح|ضع الإجابة بين/.test(x); });
+          (M.libIssues ? M.libIssues(q) : []).forEach(function (x) { if (x.k === 'bad') out.push({ k: 'bad', t: 'السؤال ' + M.ordinal(M.secInfo(e).info[i].main) + ' فرع ' + n(j + 1) + ': ' + x.t, s: i, i: j }); else errs.push(x.t); });
           if (!Number(M.itemGrade(e, it))) errs.push('بدون درجة');
           if (errs.length) out.push({ k: 'warn', t: 'السؤال ' + M.ordinal(M.secInfo(e).info[i].main) + ' فرع ' + n(j + 1) + ': ' + errs.join('، '), s: i, i: j });
         });
@@ -305,8 +315,14 @@
     function checkHTML() {
       var iss = issues();
       return '<div class="ie"><div class="chk-sum ' + (iss.some(function (x) { return x.k === 'bad'; }) ? 'bad' : iss.length ? 'warn' : 'ok') + '">' + I(iss.length ? 'warn' : 'check', 22) + '<div><b>' + (iss.length ? n(iss.length) + ' ملاحظة قبل الطباعة' : 'الورقة جاهزة للطباعة') + '</b><span>' + n(M.secInfo(e).groups.length) + ' أسئلة · ' + n(flat().length) + ' فرع · ' + n(M.examTotal(e)) + ' درجة · ' + n(e._pageCount || 1) + ' صفحة</span></div></div>' +
+        approveHTML(iss) +
         (iss.length ? '<div class="chk-list">' + iss.map(function (x) { return '<button type="button" class="chk ' + x.k + '"' + (x.s != null ? ' data-go="' + x.s + ':' + x.i + '"' : '') + '>' + esc(x.t) + '</button>'; }).join('') + '</div>' : '') +
         '<div class="out-grid">' + OUT.map(function (o) { return '<button type="button" class="out" data-out="' + o[0] + '">' + I(o[1], 22) + '<b>' + o[2] + '</b><span>' + o[3] + '</span></button>'; }).join('') + '</div></div>';
+    }
+    function approveHTML(iss) {
+      var bad = iss.filter(function (x) { return x.k === 'bad'; });
+      if (e.status === 'approved') return '<div class="alert ok">' + I('check') + '<div style="flex:1"><b>الامتحان معتمد</b>' + (e.approvedAt ? ' — ' + n(M.fmtDate(e.approvedAt, true)) : '') + '<div class="small">أي تعديل يلغي الاعتماد تلقائياً.</div></div><button type="button" class="btn sm" id="ck-unap">إلغاء الاعتماد</button></div>';
+      return '<div class="row" style="gap:8px;align-items:center"><button type="button" class="btn' + (bad.length ? '' : ' pri') + '" id="ck-ap"' + (bad.length ? ' disabled' : '') + '>' + I('check', 16) + ' اعتماد الامتحان</button>' + (bad.length ? '<span class="small bad-t">لا يمكن الاعتماد قبل معالجة ' + n(bad.length) + ' ملاحظة حمراء (نص غير واضح، إجابة مطلوبة ناقصة، مجموع الدرجات…)</span>' : '') + '</div>';
     }
     var OUT = [['pdf', 'download', 'ملف PDF جاهز', 'الامتحان فقط بالقالب والمقاس — جاهز للطباعة والإرسال'], ['word', 'download', 'ملف Word', 'للتعديل أو الإرسال'], ['print', 'print', 'طباعة مباشرة', 'يفتح نافذة الطباعة'],
       ['keypdf', 'download', 'مفتاح الإجابة PDF', 'نموذج الإجابة جاهز'], ['keyw', 'download', 'المفتاح Word', 'نموذج الإجابة'], ['keyp', 'print', 'طباعة المفتاح', 'يفتح نافذة الطباعة'],
@@ -347,6 +363,7 @@
       on('[data-addpart]', 'onclick', function (b) { addPart(+b.dataset.addpart); });
       var nb = M.qs('#ol-new', p); if (nb) nb.onclick = function () { M.typeSheet('نوع السؤال الرئيسي', function (t) { e.sections.push({ id: M.uid(), type: t, title: '', items: [newItem(t)], wordBank: true, layout: 'auto' }); touch(); select(e.sections.length - 1, 0, true); }); };
       var ai = M.qs('#ol-ai', p); if (ai) ai.onclick = openImport;
+      var lb = M.qs('#ol-lib', p); if (lb) lb.onclick = function () { openLibrary(); };
       /* نصوص السؤال والقسم والورقة */
       on('[data-qk]', 'oninput', function (el) { var q = curQ(); if (!q) return; q[el.dataset.qk] = el.value; touch(); });
       on('[data-sk]', 'oninput', function (el) { sec(sel.s)[el.dataset.sk] = el.value; touch(); });
@@ -361,14 +378,17 @@
       on('[data-qb]', 'onchange', function (el) { curQ()[el.dataset.qb] = el.checked; touch(); if (el.checked && el.dataset.qb === 'ansGrid') { var qg = curQ(); if (LINE_TYPES.indexOf(qg.type) >= 0 ? !Number(qg.lines) : !Number(qg.solLines)) { if (LINE_TYPES.indexOf(qg.type) >= 0) qg.lines = 6; else qg.solLines = 6; touch(true); } } });
       on('[data-sb]', 'onchange', function (el) { var s = sec(sel.s), k = el.dataset.sb; if (k === 'layout2') s.layout = el.checked ? 'two' : 'auto'; else s[k] = el.checked; touch(k === 'part'); });
       on('[data-eb]', 'onchange', function (el) { e[el.dataset.eb] = el.checked; fntUI(); touch(el.dataset.eb === 'showSeat'); });
-      on('[data-correct]', 'onclick', function (b) { curQ().correct = +b.dataset.correct; touch(true); });
+      on('[data-correct]', 'onclick', function (b) { var cq = curQ(); cq.correct = +b.dataset.correct; if (cq.ans === 'none' || cq.ans === 'ai') cq.ans = 'teacher'; touch(true); });
+      on('[data-ansok]', 'onclick', function () { curQ().ans = 'teacher'; touch(true); M.toast('أُكدت الإجابة', 'ok'); });
+      on('[data-revok]', 'onclick', function () { curQ().libReview = 'reviewed'; touch(true); });
+      on('[data-uncok]', 'onclick', function () { var cq = curQ(); var txt = [cq.text, cq.term, cq.correction, cq.modelAnswer].concat(cq.options || []).join(' '); if (txt.indexOf(M.UNCLEAR) >= 0) return M.toast('ما زال النص يحتوي على ⟦؟⟧ — اكتب الجزء الصحيح مكانه', 'bad'); cq.unclear = false; cq.unclearNotes = []; touch(true); });
       on('[data-delopt]', 'onclick', function (b) { var q = curQ(), i = +b.dataset.delopt; q.options.splice(i, 1); if (q.correct >= q.options.length || q.correct === i) q.correct = 0; else if (q.correct > i) q.correct--; touch(true); });
       on('[data-addopt]', 'onclick', function () { curQ().options.push(''); touch(true); var ins = M.qsa('[data-opt]', p); if (ins.length) ins[ins.length - 1].focus(); });
       on('[data-addpair]', 'onclick', function () { curQ().pairs.push({ a: '', b: '' }); touch(true); });
       on('[data-delpair]', 'onclick', function (b) { curQ().pairs.splice(+b.dataset.delpair, 1); touch(true); });
       on('[data-addlab]', 'onclick', function () { var q = curQ(); q.labels.push({ n: String(q.labels.length + 1), name: '' }); touch(true); });
       on('[data-dellab]', 'onclick', function (b) { curQ().labels.splice(+b.dataset.dellab, 1); touch(true); });
-      on('#ie-tf button', 'onclick', function (b) { curQ().answer = b.dataset.v === '1'; touch(true); });
+      on('#ie-tf button', 'onclick', function (b) { var cq = curQ(); cq.answer = b.dataset.v === '1'; if (cq.ans === 'none' || cq.ans === 'ai') cq.ans = 'teacher'; touch(true); });
       /* مقاطع الاختيار */
       on('#sk-sep button', 'onclick', function (b) { sec(sel.s).sep = b.dataset.v; touch(true); });
       on('#sk-cols button', 'onclick', function (b) { sec(sel.s).optCols = b.dataset.v; touch(true); });
@@ -413,6 +433,8 @@
       on('[data-imgtools]', 'onclick', function () { var q = curQ(); M.imageTools(q.image, function (d) { q.image = d; q.imageShapes = null; touch(true); }); });
       on('[data-go]', 'onclick', function (b) { var a = b.dataset.go.split(':'); setTabSilent('q'); if (+a[1] >= 0) select(+a[0], +a[1]); else { sel = { s: +a[0], i: -1 }; drawPane(); } });
       on('[data-out]', 'onclick', function (b) { doOut(b.dataset.out); });
+      on('#ck-ap', 'onclick', function () { if (issues().some(function (x) { return x.k === 'bad'; })) return; M.confirm('اعتماد الامتحان', 'تأكدت من الأسئلة والإجابات والدرجات؟ أي تعديل بعد الاعتماد يلغيه تلقائياً.', 'اعتماد').then(function (ok) { if (!ok) return; touch(); e.status = 'approved'; e.approvedAt = M.now(); e.approvedBy = M.me().name || ''; persist(); drawPane(); M.toast('اعتُمد الامتحان', 'ok'); M.log('اعتماد امتحان', e.title || ''); }); });
+      on('#ck-unap', 'onclick', function () { e.status = 'draft'; e.approvedAt = null; persist(); drawPane(); M.toast('أُلغي الاعتماد'); });
       /* تكبير مربع النص مع الكتابة */
       M.qsa('textarea.inp', p).forEach(autoGrow);
       if (sel && sel.focus) { sel.focus = false; var ta = M.qs('.ie-text', p); if (ta && mq.matches) setTimeout(function () { ta.focus(); }, 30); }
@@ -473,6 +495,7 @@
     function itemAct(a) {
       var s = sec(sel.s), i = sel.i;
       if (a === 'del') { var rm = s.items.splice(i, 1)[0]; if (rm) delete e.local[rm.qid]; sel = s.items.length ? { s: sel.s, i: Math.min(i, s.items.length - 1) } : { s: sel.s, i: -1 }; touch(true); return M.toast('حُذف الفرع — يمكنك التراجع', ''); }
+      if (a === 'lib') { var lq = clone(qOf(s.items[i])); if (!String(lq.text || '').trim() && lq.type !== 'match') return M.toast('اكتب السؤال أولاً', 'bad'); return M.saveToLibrary(lq, { subject: M.examSubject(e) || '', grade: e.className || '', examTitle: e.title || '' }).then(function () { M.toast('حُفظ في «مكتبة الأسئلة المستخرجة» كسؤال مكتوب يدوياً — تعديل الامتحان بعدها لا يغيّر نسخة المكتبة', 'ok'); }); }
       if (a === 'dup') { var q = clone(qOf(s.items[i])); q.id = M.uid(); e.local[q.id] = q; s.items.splice(i + 1, 0, { qid: q.id, grade: null }); touch(); return select(sel.s, i + 1); }
       var j = a === 'up' ? i - 1 : i + 1; if (j < 0 || j >= s.items.length) return;
       var t = s.items[i]; s.items[i] = s.items[j]; s.items[j] = t; sel.i = j; touch(true);
@@ -516,6 +539,32 @@
             };
           });
         } });
+    }
+    /* إضافة أسئلة من المكتبة: نسخة مستقلة لكل سؤال، وتُجمع في أسئلة رئيسية حسب النوع والتعليمات المشتركة */
+    function openLibrary() {
+      var cur = sel ? sec(sel.s) : null;
+      M.pickFromLibrary({ canAppend: !!cur, type: '' }, function (qs, where) {
+        if (!qs.length) return;
+        var first = e.sections.length, added = 0, skipped = 0;
+        if (where === 'append' && cur) {
+          qs.forEach(function (q) { if (q.type !== cur.type) { skipped++; return; } var c = M.copyForExam(q); e.local[c.id] = c; cur.items.push({ qid: c.id, grade: null }); added++; });
+          if (skipped) M.toast(n(skipped) + ' سؤال من نوع مختلف لم يُضف للسؤال المحدد — أضفه كسؤال جديد', 'bad');
+        } else {
+          var last = null;
+          qs.forEach(function (q) {
+            var c = M.copyForExam(q), ctx = q.ctx || {}, title = ctx.title || '', pass = ctx.passage || '';
+            if (!last || last.type !== q.type || (last._t !== title) || (last._p !== pass)) {
+              last = { id: M.uid(), type: q.type, title: title, passage: pass, items: [], wordBank: true, layout: 'auto', _t: title, _p: pass };
+              e.sections.push(last);
+            }
+            e.local[c.id] = c; last.items.push({ qid: c.id, grade: null }); added++;
+          });
+          e.sections.forEach(function (x) { delete x._t; delete x._p; if (!x.passage) delete x.passage; });
+        }
+        if (!added) return;
+        touch(true); M.toast('أُضيف ' + n(added) + ' سؤال من المكتبة — نسخ مستقلة داخل الامتحان', 'ok');
+        if (where !== 'append') setTimeout(function () { var el = M.qs('[data-sec="' + first + '"]', pagesBox); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 500);
+      });
     }
     function openImport() {
       if (!M.importDialog) return M.toast('الاستيراد غير متاح', 'bad');

@@ -129,20 +129,32 @@
           st.innerHTML = '<div class="alert info"><span class="pulse">' + I('spark') + '</span><div style="flex:1"><b id="imp-sub">يقرأ الأسئلة ويحدد أنواعها…</b> <span id="imp-tm" class="p-code">٠:٠٠</span><div class="small muted">أبقِ الشاشة مفتوحة — عادة أقل من دقيقة لكل صفحة.</div></div></div>';
           M.sound && M.sound('start');
           M._aiStatus = function (t) { var el = M.qs('#imp-sub', m); if (el) el.textContent = t; };
-          var job;
-          if (mode === 'txt') job = M.aiRaw(r, model, spec([], text)).then(function (x) { return convert(x.data, []); });
-          else {
-            /* صفحة في كل طلب، صفحتان في نفس الوقت، ثم الدمج بالترتيب */
-            var res = new Array(images.length), done = 0, errs = [], q2 = images.map(function (_, i) { return i; });
-            var one = function (i) { return M.aiRaw(r, model, spec([images[i]], '')).then(function (x) { (x.data.groups || []).forEach(function (g) { (g.parts || []).forEach(function (p) { (p.questions || []).forEach(function (qq) { if (qq.figure && qq.figure.img >= 0) qq.figure.img = i; }); }); }); res[i] = x.data.groups || []; })
-              .catch(function (er) { errs.push('صفحة ' + n(i + 1) + ': ' + M.aiFriendly(er.message)); }).then(function () { done++; M._aiStatus && M._aiStatus('قراءة الصفحات — ' + n(done) + ' من ' + n(images.length)); }); };
-            var worker = function () { var i = q2.shift(); return i == null ? Promise.resolve() : one(i).then(worker); };
-            job = Promise.all([worker(), worker()]).then(function () {
-              if (errs.length === images.length) throw new Error(errs[0]);
-              if (errs.length) M.toast('تعذّرت قراءة: ' + errs.join(' · '), 'bad');
-              return convert({ groups: [].concat.apply([], res.filter(Boolean)) }, images);
+          /* نفس محرك «الاستخراج»: صيغة رد مختصرة (أسرع بكثير من JSON الطويل) بدون تخمين للإجابات */
+          var units = mode === 'txt'
+            ? [{ key: M.uid(), srcId: 'paste', name: 'النص الملصوق', kind: 'docx', n: 1, label: 'النص الملصوق', from: 1, to: 1, images: [], imageIdx: [], text: text.split(/\r?\n/).map(function (l, i) { return '[ف' + (i + 1) + '] ' + l; }).join('\n') }]
+            : images.map(function (d, i) { return { key: M.uid(), srcId: 'img', name: 'صورة الأسئلة', kind: 'image', n: i + 1, label: 'صفحة ' + n(i + 1), img: d, orig: d, text: '' }; });
+          var tmp = { id: M.uid(), units: units, _gone: true };
+          var job = M.runExtract(tmp, r, model, function () {
+            var d0 = units.filter(function (u) { return u.status === 'done' || u.status === 'failed'; }).length;
+            M._aiStatus && M._aiStatus(units.length > 1 ? 'قراءة الصفحات — ' + n(d0) + ' من ' + n(units.length) : 'يقرأ الأسئلة ويحدد أنواعها…');
+          }).then(function () {
+            var errs = units.filter(function (u) { return u.status !== 'done'; });
+            if (errs.length === units.length) throw new Error(errs[0].error || 'تعذّرت القراءة');
+            if (errs.length) M.toast('تعذّرت قراءة: ' + errs.map(function (u) { return u.label + ' — ' + u.error; }).join(' · '), 'bad');
+            return M.assembleExtract(tmp);
+          }).then(function (res) {
+            /* تجميع: سؤال رئيسي ← أجزاء حسب النوع والتعليمات */
+            var groups = [], g = null, part = null;
+            res.questions.forEach(function (q) {
+              var main = (q.ctx && q.ctx.main) || '', title = (q.ctx && q.ctx.title) || '';
+              if (!g || g._m !== main) { g = { _m: main, mainTitle: '', parts: [] }; groups.push(g); part = null; }
+              if (!part || part.type !== q.type || part.title !== title) { part = { title: title, type: q.type, questions: [] }; g.parts.push(part); }
+              q._sure = M.hasAnswer(q); delete q._sel; delete q.orig; delete q.src;
+              part.questions.push(q);
             });
-          }
+            groups.forEach(function (x) { delete x._m; if (x.parts.length > 1) x.mainTitle = 'أجب عن الأسئلة الآتية:'; });
+            return groups;
+          });
           job.then(function (g) { clearInterval(tick); M._aiStatus = null; finish(g); }).catch(function (er) { clearInterval(tick); M._aiStatus = null; ok.disabled = false; st.innerHTML = '<div class="alert bad">' + I('warn') + '<div>' + esc(M.aiFriendly(er.message)) + '</div></div>'; M.sound && M.sound('error'); });
         };
         M.qs('#imp-copy', m).onclick = function () {
@@ -167,7 +179,7 @@
           var id = gi + ':' + pi + ':' + qi;
           h += '<label class="imp-q"><input type="checkbox" data-q="' + id + '" checked><span class="b"><span class="paper-font">' + M.richText(q.text || (q.pairs || []).map(function (x) { return x.a + ' ← ' + x.b; }).join(' · '), 'arabic') + '</span>' +
             (q.type === 'mcq' ? '<span class="small">' + q.options.map(function (o, i) { return i === q.correct ? '<b class="ok">' + esc(o) + ' ✓</b>' : esc(o); }).join(' · ') + '</span>' : '') +
-            (q.type === 'tf' ? '<span class="small"><b class="ok">' + (q.answer ? 'صح' : 'خطأ' + (q.correction ? ' — ' + esc(q.correction) : '')) + '</b></span>' : '') +
+            (q.type === 'tf' && (q.answer === true || q.answer === false) ? '<span class="small"><b class="ok">' + (q.answer ? 'صح' : 'خطأ' + (q.correction ? ' — ' + esc(q.correction) : '')) + '</b></span>' : '') +
             (q.figure ? '<span class="imp-fig"><img src="' + q.figure + '" alt="الرسمة"><span class="small">قُصّت الرسمة من الصورة — تقدر تعدّل القص بعد الإضافة</span></span>' : '') +
             (!q._sure ? '<span class="small warn-t">الإجابة غير موجودة في المصدر — تبقى «غير محددة» حتى تكتبها</span>' : '') + '</span><span class="g">' + n(q.grade) + '</span></label>';
         });

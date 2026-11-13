@@ -218,6 +218,7 @@ window.M = window.M || {};
     return M.toWestern(String(s || ''))
       .replace(/[ً-ْـ]/g, '')
       .replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي')
+      .replace(/[،؛؟٪«»٫٬]/g, ' ')
       .replace(/[^؀-ۿa-zA-Z0-9]+/g, ' ')
       .trim().toLowerCase();
   };

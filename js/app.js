@@ -178,7 +178,7 @@
     M.qs('#h-newexam', main).onclick = function () { M.newExamWizard(); };
     M.bindExamCards && M.bindExamCards(main);
     M.bindSafety(main);
-    if (M.extractJobs) M.extractJobs().then(function (js) { var box = M.qs('#h-jobs', main); if (!box || !js.length) return; box.innerHTML = '<div class="alert info">' + I('file') + '<div style="flex:1">لديك ' + n(js.length) + ' مهمة استخراج غير مكتملة — نتائجها محفوظة على الجهاز.</div>' + js.slice(0, 3).map(function (j) { return '<a class="btn sm" href="#/extract/' + j.id + '">' + esc((j.sources || []).map(function (x) { return x.name; }).join('، ').slice(0, 40) || 'مهمة') + '</a>'; }).join('') + '</div>'; });
+    if (M.extractJobs) M.extractJobs().then(function (js) { var box = M.qs('#h-jobs', main); if (!box || !js.length) return; box.innerHTML = '<div class="alert info">' + I('file') + '<div style="flex:1">لديك ' + n(js.length) + ' مهمة استخراج أو توليد غير مكتملة — نتائجها محفوظة على الجهاز.</div>' + js.slice(0, 3).map(function (j) { return '<a class="btn sm" href="#/' + (j.kind === 'generate' ? 'generate' : 'extract') + '/' + j.id + '">' + (j.kind === 'generate' ? 'توليد: ' : 'استخراج: ') + esc((j.sources || []).map(function (x) { return x.name; }).join('، ').slice(0, 40) || 'مهمة') + '</a>'; }).join('') + '</div>'; });
     M.folderReconnectBar().then(function (h) { var fb = M.qs('#h-folderbar', main); if (fb && h) { fb.innerHTML = h; M.bindSafety(fb); } });
   };
 

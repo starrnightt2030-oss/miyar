@@ -50,6 +50,12 @@
         '<div class="row" style="gap:4px">' + (p.ambiguous ? '' : '<button type="button" class="btn sm" data-aiok>استخدام كإجابة مقترحة</button>') + '<button type="button" class="btn sm ghost" data-ainot>تجاهل</button></div></div>';
     }
     if (q.ans === 'ai' && M.hasAnswer(q)) h += '<div class="lq-ai small">' + I('warn', 15) + ' الإجابة الحالية مقترحة من الذكاء الاصطناعي. <button type="button" class="btn sm" data-confirm>أؤكد أن الإجابة صحيحة</button></div>';
+    if (o.gen || q.lib === 'generated' || q.evidence) {
+      var ev = q.evidence || {};
+      h += '<div class="lq-ev small"><b>الدليل من المصدر' + (ev.label ? ' (' + esc(ev.name || '') + ' — ' + esc(ev.label) + ')' : '') + ':</b> ' + (ev.quote ? '<span class="paper-font">«' + esc(ev.quote) + '»</span>' : '<span class="bad-t">لا يوجد</span>') + '</div>' +
+        '<div class="field"><label>التفسير / سبب صحة الإجابة</label><textarea class="inp paper-font" rows="2" data-f2="explanation">' + esc(q.explanation || '') + '</textarea></div>' +
+        ((q.genIssues || []).length ? '<div class="row" style="gap:4px">' + q.genIssues.map(function (t) { return chip('warn', esc(t)) + ''; }).join('') + '<button type="button" class="btn sm ghost" data-gifix>عالجت الملاحظات</button></div>' : '');
+    }
     if (q.figure) h += '<div class="lq-fig"><img src="' + q.figure + '" alt="الرسم المرتبط بالسؤال"><div class="row" style="gap:4px"><button type="button" class="btn sm" data-figedit>' + I('fit', 14) + ' تعديل</button><button type="button" class="btn sm ghost" data-figdel>إزالة الرسم</button></div></div>';
     h += '</div>';
     if (o.review) h += '<div class="lq-f"><button type="button" class="btn sm ghost" data-split>تقسيم عند المؤشر</button><button type="button" class="btn sm ghost" data-merge>دمج مع التالي</button><button type="button" class="btn sm ghost" data-remove>' + I('trash', 14) + ' استبعاد</button></div>';
@@ -73,6 +79,8 @@
       on('[data-sel]', 'onchange', function (el) { q._sel = el.checked; h.onChange(q, false); });
       on('[data-type]', 'onchange', function (el) { changeType(q, el.value); h.onChange(q, true); });
       on('[data-f]', 'oninput', function (el) { q[el.dataset.f] = el.value; if (el.dataset.f !== 'text' || q.type === 'complete') teacher(); ch(false); });
+      on('[data-f2]', 'oninput', function (el) { q[el.dataset.f2] = el.value; h.onChange(q, false); });
+      on('[data-gifix]', 'onclick', function () { q.genIssues = []; h.onChange(q, true); });
       on('[data-ctx]', 'oninput', function (el) { q.ctx = q.ctx || {}; q.ctx[el.dataset.ctx] = el.value; h.onChange(q, false); });
       on('[data-opt]', 'oninput', function (el) { q.options[+el.dataset.opt] = el.value; h.onChange(q, false); });
       on('[data-correct]', 'onchange', function (el) { var v = +el.dataset.correct; q.correct = v < 0 ? null : v; teacher(); ch(true); });
@@ -228,6 +236,7 @@
       '<div class="paper-font lib-t">' + M.richText(q.text || (q.pairs || []).map(function (p) { return p.a + ' ← ' + p.b; }).join(' · '), 'arabic') + '</div>' +
       (q.type === 'mcq' ? '<div class="small">' + q.options.map(function (o, i) { return i === q.correct ? '<b class="ok-t">' + esc(o) + ' ✓</b>' : esc(o); }).join(' · ') + '</div>' : '') +
       '<div class="small muted">' + [m.subject, m.grade, m.unit, m.lesson].filter(Boolean).map(esc).join(' · ') + ((m.tags || []).length ? ' · #' + m.tags.map(esc).join(' #') : '') + (([m.subject, m.grade, m.unit, m.lesson].filter(Boolean).length || (m.tags || []).length) ? ' — ' : '') + srcLabel(q) + ' · أُنشئ ' + n(M.fmtDate(q.createdAt)) + (q.updatedAt !== q.createdAt ? ' · عُدّل ' + n(M.fmtDate(q.updatedAt)) : '') + '</div>' +
+      (q.evidence && q.evidence.quote ? '<div class="small muted">الدليل: <span class="paper-font">«' + esc(q.evidence.quote.slice(0, 160)) + '»</span></div>' : '') +
       (iss.length ? '<div class="small bad-t">' + iss.map(function (x) { return esc(x.t); }).join(' · ') + '</div>' : '') + '</div>' +
       '<div class="lib-ra"><button class="btn sm" data-act="view" data-id="' + q.id + '">' + I('eye', 15) + ' معاينة</button><button class="btn sm" data-act="edit" data-id="' + q.id + '">' + I('edit', 15) + ' تعديل</button>' +
       '<button class="btn sm ghost" data-act="copy" data-id="' + q.id + '" aria-label="نسخ">' + I('copy', 15) + '</button>' + (q.src && q.src.id ? '<button class="btn sm ghost" data-act="src" data-id="' + q.id + '" aria-label="المصدر">' + I('file', 15) + '</button>' : '') + '<button class="btn sm ghost" data-act="del" data-id="' + q.id + '" aria-label="حذف">' + I('trash', 15) + '</button></div></div>';
@@ -255,6 +264,7 @@
         M.qs('#ed-ai', m).onclick = function () { if (M.hasAnswer(q) && q.ans !== 'none') return M.toast('للسؤال إجابة بالفعل', 'ok'); M.aiAnswerDialog(arr, draw); };
         M.qs('[data-ok]', m).onclick = function () {
           var rv = M.qs('#ed-rv', m).value;
+          if (rv === 'approved' && !M.canApproveLib()) return M.toast('اعتماد الأسئلة لرئيس القسم أو مدير النظام', 'bad');
           if (rv === 'approved') { var iss = M.libIssues(Object.assign({}, q, { review: 'approved' })).filter(function (x) { return x.k === 'bad' || /مقترحة/.test(x.t); }); if (iss.length) return M.toast('لا يمكن الاعتماد: ' + iss.map(function (x) { return x.t; }).join('، '), 'bad'); }
           q.meta = q.meta || {};
           M.qsa('[data-meta]', m).forEach(function (el) { q.meta[el.dataset.meta] = el.dataset.meta === 'tags' ? el.value.split(/[،,]/).map(function (x) { return x.trim(); }).filter(Boolean) : el.value.trim(); });
@@ -279,7 +289,7 @@
             return p.then(function () {
               q.meta = q.meta || {};
               Object.keys(meta).forEach(function (k) { if (k === 'tags') q.meta.tags = ((q.meta.tags || []).concat(meta.tags.split(/[،,]/).map(function (x) { return x.trim(); }).filter(Boolean))).filter(function (x, i, a) { return a.indexOf(x) === i; }); else q.meta[k] = meta[k]; });
-              if (rv === 'approved' && M.libIssues(q).some(function (x) { return x.k === 'bad' || /مقترحة/.test(x.t); })) blocked++;
+              if (rv === 'approved' && (!M.canApproveLib() || M.libIssues(q).some(function (x) { return x.k === 'bad' || /مقترحة/.test(x.t); }))) blocked++;
               else if (rv) q.review = rv;
               return M.save('questions', q, { log: false });
             });

@@ -11,6 +11,8 @@
   M.BLANK_UNKNOWN = '؟';
   var OBJECTIVE = ['mcq', 'tf', 'complete', 'term', 'match'];
 
+  /* الاعتماد في المكتبة: للمستخدم المحلي، وعند تفعيل الأونلاين لرئيس القسم والمدير */
+  M.canApproveLib = function () { return !(M.cloud && M.cloud.user && M.cloud.profile && M.cloud.profile.approved) || M.can('approve'); };
   M.libQs = function (lib) { return S.questions.filter(function (q) { return q.lib === lib && !q.deleted; }); };
 
   /* هل الإجابة المطلوبة موجودة فعلاً؟ (لا تُعتبر القيم الافتراضية إجابة) */
@@ -43,6 +45,7 @@
     else if (q.ans === 'ai') out.push({ k: 'warn', t: 'إجابة مقترحة من الذكاء الاصطناعي لم تُؤكَّد' });
     if (q.suggest && q.suggest.text) out.push({ k: 'warn', t: 'يوجد تصحيح لغوي مقترح لم يُقبل أو يُرفض' });
     if (q.libReview === 'needs' || (q.lib && q.review === 'needs')) out.push({ k: 'warn', t: 'لم تتم مراجعته في المكتبة' });
+    (q.genIssues || []).forEach(function (t) { out.push({ k: 'warn', t: t }); });
     return out;
   };
 
@@ -165,7 +168,7 @@
     c.libRef = { id: q.id, lib: q.lib, ver: q.ver || 1, at: M.now() };
     c.libReview = q.review || 'needs';
     c.id = M.uid(); c.source = 'exam';
-    ['lib', 'review', 'meta', 'src', 'orig', 'deleted', 'cloudAt', 'cloudErr', 'cloudErrAt', 'ownerId', 'ver', 'createdAt', 'updatedAt', 'updatedBy', 'updatedByName', 'createdBy', 'usedIn', 'gen'].forEach(function (k) { delete c[k]; });
+    ['lib', 'review', 'meta', 'src', 'orig', 'deleted', 'genIssues', 'evidence', 'origin', 'cloudAt', 'cloudErr', 'cloudErrAt', 'ownerId', 'ver', 'createdAt', 'updatedAt', 'updatedBy', 'updatedByName', 'createdBy', 'usedIn', 'gen'].forEach(function (k) { delete c[k]; });
     return c;
   };
   /* حفظ سؤال مكتوب داخل امتحان في مكتبة الأسئلة (يدوي — ليس مولداً بالذكاء الاصطناعي) */

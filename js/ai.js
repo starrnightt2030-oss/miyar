@@ -158,6 +158,9 @@
         else gc.responseJsonSchema = spec.schema;
         /* Gemini 3: التفكير المنخفض أسرع بكثير ويكفي لصياغة الأسئلة */
         if (/gemini-3/.test(model) && !legacy) gc.thinkingConfig = { thinkingLevel: 'low' };
+        /* مهام النقل والقراءة لا تحتاج «تفكيراً» طويلاً: إيقافه في Flash يجعل الرد أسرع عدة مرات */
+        else if (spec.fast && /gemini-2\.5-flash|flash-latest/.test(model) && !legacy) gc.thinkingConfig = { thinkingBudget: 0 };
+        else if (spec.fast && /gemini-2\.5-pro|pro-latest/.test(model) && !legacy) gc.thinkingConfig = { thinkingBudget: 128 };
         return { __model: model, systemInstruction: { parts: [{ text: spec.system }] }, contents: [{ role: 'user', parts: parts }], generationConfig: gc };
       },
       call: function (body, key, tmo) {
@@ -177,7 +180,7 @@
         });
       },
       /* Flash أولاً: ممتاز في قراءة الصور ومتاح في الحصة المجانية (Pro غالباً يحتاج حساباً مدفوعاً) */
-      pick: function (list) { return pickBy(list.filter(function (m) { return !/(preview-0|exp|lite|nano|gemma)/.test(m.id); }).concat(list), [/flash/, /pro/, /gemini/]); }
+      pick: function (list) { return pickBy(list.filter(function (m) { return !/(preview-0|exp|lite|nano|gemma)/.test(m.id); }).concat(list), [/^gemini-2\.5-flash$/, /^gemini-flash-latest$/, /flash/, /pro/, /gemini/]); }
     }
   };
   function pickBy(list, pats) { for (var i = 0; i < pats.length; i++) { var m = list.find(function (x) { return pats[i].test(x.id); }); if (m) return m.id; } return list[0] ? list[0].id : ''; }
@@ -323,6 +326,12 @@
   M.aiRaw = function (route, model, spec) {
     return withRetry(function () { return schemaFallback(route, function (lg) { return rawCall(route, model, spec, lg); }); }, 3)
       .then(function (r) { return { data: parseObj(r.text), usage: r.usage }; });
+  };
+  /* طلب نصي حر (بدون مخطط JSON): أسرع بكثير في النقل من الصور لأن الرد قصير */
+  M.aiText = function (route, model, spec) {
+    var sp = Object.assign({}, spec, { schema: null });
+    return withRetry(function () { return rawCall(route, model, sp, 0).catch(function (e) { if (route.provider === 'gemini' && /thinking|Unknown name|Invalid JSON payload/i.test(e.message)) return rawCall(route, model, sp, 1); throw e; }); }, 3)
+      .then(function (r) { return { text: String(r.text || ''), usage: r.usage }; });
   };
   M.aiCall = function (route, model, spec) {
     return withRetry(function () { return aiCall0(route, model, spec); }, 3);

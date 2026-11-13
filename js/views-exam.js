@@ -68,11 +68,25 @@
     });
     if (emptyQuestions) ne.sections = ne.sections.map(function (s) { var q = M.newQuestion(s.type, ''); q.grade = M.TYPE[s.type].grade; local[q.id] = q; s.items = [{ qid: q.id, grade: null }]; return s; });
     ne.local = local; ne.title = emptyQuestions ? ne.title : ne.title + ' (نسخة)';
+    /* دليل التصحيح يُنسخ بمعرفات الأسئلة الجديدة (مسودة في النسخة) */
+    if (emptyQuestions || !e.guide || !M.guideRemap) delete ne.guide; else ne.guide = M.guideRemap(e.guide, map, false);
+    Object.defineProperty(ne, '_qmap', { value: map, enumerable: false });
     return ne;
   };
+  /* ملف المشاركة: الافتراضي الآمن بدون إجابات ولا دليل تصحيح، والنسخة الكاملة للمعلم الزميل فقط */
   M.exportExamFile = function (e) {
-    var data = { kind: 'miyar-exam', app: 'miyar', ver: M.VERSION, at: M.now(), exam: e, local: e.local || {} };
-    M.download(JSON.stringify(data), (e.title || 'امتحان') + (e.model ? ' - ' + e.model : '') + '.miyar-exam.json', 'application/json');
+    var name = (e.title || 'امتحان') + (e.model ? ' - ' + e.model : '');
+    var go = function (full) {
+      var ex = full ? e : M.examForStudents(e);
+      var data = { kind: 'miyar-exam', app: 'miyar', ver: M.VERSION, at: M.now(), exam: ex, local: ex.local || {} };
+      M.download(name + (full ? '' : ' - بدون إجابات') + '.miyar-exam.json', JSON.stringify(data), 'application/json');
+    };
+    if (!M.examForStudents) return go(true);
+    M.modal({ title: 'ملف للمشاركة', body: '<p class="small muted" style="margin:0 0 10px">يفتحه أي مستخدم للتطبيق. اختر ما يحتويه:</p>' +
+      '<button type="button" class="btn pri block" data-sh="0" style="width:100%;justify-content:flex-start;margin-bottom:8px">' + M.icon('lock', 16) + ' بدون إجابات ولا دليل تصحيح (آمن للمشاركة)</button>' +
+      '<button type="button" class="btn block" data-sh="1" style="width:100%;justify-content:flex-start">' + M.icon('file', 16) + ' كامل بالإجابات ودليل التصحيح — لمعلم زميل فقط</button>',
+      foot: '<button class="btn" data-x>إلغاء</button>',
+      onMount: function (m, close) { M.qsa('[data-sh]', m).forEach(function (b) { b.onclick = function () { close(); go(b.dataset.sh === '1'); }; }); } });
   };
   M.importExamFile = function () {
     return M.pickFile('.json,application/json').then(function (f) {

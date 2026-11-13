@@ -541,16 +541,29 @@
     return simplePages(c, h);
   };
 
-  function simplePages(c, innerHTML) {
+  /* opts: bw (أبيض وأسود إجباري) · foot (نص التذييل بدل التمنيات) · mini (شريط أعلى الصفحات التالية)
+     الكتلة التي عليها .kn (عنوان) تنتقل مع الكتلة التالية لها إن لم تتسع */
+  function simplePages(c, innerHTML, opts) {
+    opts = opts || {};
     var root = measureRoot(); root.innerHTML = '';
     var tmp = document.createElement('div'); tmp.innerHTML = innerHTML;
     var blocks = Array.prototype.slice.call(tmp.children);
     var pages = [], body;
-    function np() { var p = pageShell(c); p.querySelector('.p-cont').remove(); root.appendChild(p); pages.push(p); body = p.querySelector('.pg-body'); if (pages.length === 1) body.insertAdjacentHTML('beforeend', headerHTML(c, '<b data-pn></b>&nbsp;من&nbsp;<b data-pt></b>')); }
+    function np() {
+      var p = pageShell(c); p.querySelector('.p-cont').remove();
+      if (opts.bw) { p.classList.add('bw', 'p-guide'); p.style.setProperty('--pc', '#000'); }
+      if (opts.foot != null) { var w = p.querySelector('.p-foot .wish'); if (w) w.textContent = opts.foot; }
+      root.appendChild(p); pages.push(p); body = p.querySelector('.pg-body');
+      if (pages.length === 1) body.insertAdjacentHTML('beforeend', headerHTML(c, '<b data-pn></b>&nbsp;من&nbsp;<b data-pt></b>'));
+      else if (opts.mini) body.insertAdjacentHTML('beforeend', opts.mini);
+    }
     np();
     blocks.forEach(function (b) {
       body.appendChild(b);
-      if (overflow(body) && body.children.length > 1) { b.remove(); np(); body.appendChild(b); }
+      if (overflow(body) && body.children.length > 1) {
+        var prev = b.previousElementSibling, carry = prev && prev.classList.contains('kn') && body.children.length > 2 ? prev : null;
+        b.remove(); if (carry) carry.remove(); np(); if (carry) body.appendChild(carry); body.appendChild(b);
+      }
     });
     pages.forEach(function (p, i) {
       M.qsa('[data-pn]', p).forEach(function (x) { x.textContent = c.num(i + 1); });
@@ -558,6 +571,7 @@
     });
     var out = pages.map(function (p) { return p.outerHTML; }); root.innerHTML = ''; return out;
   }
+  M._pctx = ctx; M._simplePages = simplePages;
 
   /* معاينة سؤال واحد داخل محرر السؤال */
   M.renderQuestionPreview = function (q, digits) {

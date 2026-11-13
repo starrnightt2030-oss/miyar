@@ -70,6 +70,14 @@
       if (redrawPane) drawPane();
       updUndo();
     }
+    var gapi = {
+      e: function () { return e; },
+      save: function (redraw) { recordHist(); saveState('جارٍ الحفظ…'); persist(); if (view === 'guide') paperSoon(); if (redraw) drawPane(); updUndo(); },
+      setView: function (v) { var b = M.qs('#sd-view button[data-v="' + v + '"]', app); if (b) b.click(); },
+      out: function (a) { doOut(a); },
+      editItem: function (s, i) { setTab('q'); select(s, i, true); },
+      redraw: function () { drawPane(); }
+    };
     function restore(snap) {
       e = JSON.parse(snap); lastSnap = snap; burst = false; clearTimeout(histTimer);
       if (sel && (!sec(sel.s) || (sel.i >= 0 && !itemAt(sel.s, sel.i)))) sel = null;
@@ -88,10 +96,10 @@
       '<button class="btn hide-sm" id="sd-pdf">' + I('download', 16) + ' PDF</button><button class="btn hide-sm" id="sd-word">' + I('download', 16) + ' Word</button><button class="btn pri" id="sd-out">' + I('print', 16) + ' إخراج</button></header>' +
       '<div class="sd-body" id="sd-body">' +
       '<section class="sd-panel" id="sd-panel"><nav class="sd-tabs" role="tablist">' +
-      [['q', 'الأسئلة'], ['tpl', 'القالب'], ['info', 'البيانات'], ['check', 'المراجعة']].map(function (t) { return '<button type="button" role="tab" data-tab="' + t[0] + '">' + t[1] + '</button>'; }).join('') +
+      [['q', 'الأسئلة'], ['tpl', 'القالب'], ['info', 'البيانات'], ['check', 'المراجعة'], ['guide', 'التصحيح']].map(function (t) { return '<button type="button" role="tab" data-tab="' + t[0] + '">' + t[1] + '</button>'; }).join('') +
       '</nav><div class="sd-pane" id="sd-pane"></div></section>' +
       '<div class="sd-split" id="sd-split" role="separator" aria-label="اسحب لتغيير المساحة"><span></span></div>' +
-      '<section class="sd-paper" aria-label="معاينة الورقة"><div class="sd-ptools"><div class="seg" id="sd-view"><button type="button" data-v="paper" class="on">الورقة</button><button type="button" data-v="key">المفتاح</button></div>' +
+      '<section class="sd-paper" aria-label="معاينة الورقة"><div class="sd-ptools"><div class="seg" id="sd-view"><button type="button" data-v="paper" class="on">الورقة</button><button type="button" data-v="key">المفتاح</button><button type="button" data-v="guide" title="نموذج الإجابة ودليل التصحيح — خاص بالمصحح">الدليل</button></div>' +
       '<span class="sd-pc" id="sd-pc"></span><span style="flex:1"></span>' +
       '<div class="sd-fnt" role="group" aria-label="خط الامتحان كله"><button type="button" class="btn icon sm ghost" id="sd-fsm" aria-label="تصغير خط الامتحان كله" title="تصغير الخط للامتحان كله">A−</button><span id="sd-fsv" title="حجم خط الامتحان"></span><button type="button" class="btn icon sm ghost" id="sd-fsp" aria-label="تكبير خط الامتحان كله" title="تكبير الخط للامتحان كله">A+</button><button type="button" class="btn icon sm ghost" id="sd-bold" aria-label="خط عريض للامتحان كله" title="خط عريض (Bold) للامتحان كله"><b>B</b></button></div>' +
       '<button class="btn icon sm ghost" id="sd-zo" aria-label="تصغير المعاينة" title="تصغير المعاينة (لا يغيّر الطباعة)">' + I('zout', 18) + '</button><button class="btn sm ghost" id="sd-zf" aria-label="ملء العرض" title="المعاينة بعرض المساحة">' + I('fit', 16) + '</button><button class="btn icon sm ghost" id="sd-zi" aria-label="تكبير المعاينة" title="تكبير المعاينة (لا يغيّر الطباعة)">' + I('zin', 18) + '</button></div>' +
@@ -117,8 +125,10 @@
       if (tab === 'q') pane.innerHTML = sel ? (sel.i >= 0 ? itemHTML() : sectionHTML()) : outlineHTML();
       else if (tab === 'tpl') pane.innerHTML = tplHTML();
       else if (tab === 'info') pane.innerHTML = infoHTML();
+      else if (tab === 'guide') pane.innerHTML = M.guidePaneHTML(e);
       else pane.innerHTML = checkHTML();
       bindPane(pane);
+      if (tab === 'guide') M.guidePaneBind(pane, gapi);
       if (tab !== 'q' || !sel || sel.keepScroll) pane.scrollTop = keep;
       drawHead();
       highlight();
@@ -310,6 +320,7 @@
           if (errs.length) out.push({ k: 'warn', t: 'السؤال ' + M.ordinal(M.secInfo(e).info[i].main) + ' فرع ' + n(j + 1) + ': ' + errs.join('، '), s: i, i: j });
         });
       });
+      if (e.guide && M.guideCheck) { var gc = M.guideCheck(e); if (gc.stale) out.push({ k: 'warn', t: 'دليل التصحيح: ' + n(gc.stale) + ' فرع تعدّل بعد كتابة توزيعه — راجعه من تبويب «التصحيح»' }); }
       return out;
     }
     function checkHTML() {
@@ -326,6 +337,7 @@
     }
     var OUT = [['pdf', 'download', 'ملف PDF جاهز', 'الامتحان فقط بالقالب والمقاس — جاهز للطباعة والإرسال'], ['word', 'download', 'ملف Word', 'للتعديل أو الإرسال'], ['print', 'print', 'طباعة مباشرة', 'يفتح نافذة الطباعة'],
       ['keypdf', 'download', 'مفتاح الإجابة PDF', 'نموذج الإجابة جاهز'], ['keyw', 'download', 'المفتاح Word', 'نموذج الإجابة'], ['keyp', 'print', 'طباعة المفتاح', 'يفتح نافذة الطباعة'],
+      ['gpdf', 'download', 'دليل التصحيح PDF', 'خاص بالمصحح — أبيض وأسود'], ['gword', 'download', 'دليل التصحيح Word', 'خاص بالمصحح'], ['gprint', 'print', 'طباعة دليل التصحيح', 'خاص بالمصحح'],
       ['models', 'copy', 'نموذجان (أ) و(ب)', 'نفس الأسئلة بترتيب مختلف'], ['tpl', 'layers', 'احفظ الهيكل كقالب', 'امتحان جديد بنفس التقسيم والدرجات'], ['file', 'download', 'ملف للمشاركة', 'يفتحه زميلك في التطبيق']];
 
     function doOut(a) {
@@ -337,11 +349,20 @@
       if (a === 'word') { M.renderExamPages(e); M.exportExamWord(e).catch(function (er) { M.toast('تعذّر التصدير: ' + er.message, 'bad'); }); }
       if (a === 'keyp') M.printPages(M.renderKeyPages(e), 'مفتاح الإجابة - ' + title);
       if (a === 'keyw') M.exportKeyWord(e);
+      if (a === 'gpdf' || a === 'gprint' || a === 'gword') {
+        var gck = M.guideCheck(e), gv = (M.guideOf(e).ver || 1), gt = 'دليل التصحيح - ' + title + ' - الإصدار ' + gv;
+        if (M.guideOf(e).status !== 'approved') M.toast('تنبيه: الدليل مسودة غير معتمدة' + (gck.bad.length ? ' وبه ' + n(gck.bad.length) + ' ملاحظة حمراء' : ''), 'bad');
+        if (a === 'gpdf') M.exportPDF(M.renderGuidePages(e), gt);
+        if (a === 'gprint') M.printPages(M.renderGuidePages(e), gt);
+        if (a === 'gword') M.exportGuideWord(e).catch(function (er) { M.toast('تعذّر التصدير: ' + er.message, 'bad'); });
+      }
       if (a === 'file') M.exportExamFile(e);
       if (a === 'tpl') { var t = M.cloneExam(e, true); t.title = e.title; M.save('exams', t).then(function () { M.toast('أُنشئ امتحان جديد بنفس الهيكل — فروعه فارغة', 'ok'); M.go('#/studio/' + t.id); }); }
       if (a === 'models') {
         e.model = e.model || 'أ'; e.groupId = e.groupId || M.uid(); touch();
         var b = M.cloneExam(e, false); b.title = e.title; b.model = 'ب'; b.groupId = e.groupId; b.shuffleOptions = true; b.shuffleSeed = M.uid();
+        /* نفس دليل التصحيح ونفس الإصدار والاعتماد — يُعرض بترتيب النموذج (ب) تلقائياً */
+        if (e.guide && M.guideRemap) b.guide = M.guideRemap(e.guide, b._qmap, true);
         var rng = M.rng(b.shuffleSeed);
         b.sections.forEach(function (s) { if (s.type !== 'match' && s.type !== 'complete') s.items = M.shuffle(s.items, rng); });
         M.save('exams', b).then(function () { M.toast('أُنشئ النموذج (ب) — نفس الأسئلة بترتيب مختلف', 'ok'); M.go('#/studio/' + b.id); });
@@ -351,7 +372,7 @@
     /* ===== ربط عناصر اللوحة ===== */
     function bindPane(p) {
       var on = function (sel2, ev, fn) { M.qsa(sel2, p).forEach(function (el) { el[ev] = function (x) { fn(el, x); }; }); };
-      p.onfocusin = function (ev) { if (ev.target.matches('input.inp,textarea.inp')) lastField = ev.target; };
+      if (!p._fin) { p._fin = true; p.addEventListener('focusin', function (ev) { if (ev.target.matches('input.inp,textarea.inp')) lastField = ev.target; }); }
       on('[data-back]', 'onclick', function () { sel = null; drawPane(); });
       on('[data-nav]', 'onclick', function (b) { var all = flat(), k = all.findIndex(function (x) { return x.s === sel.s && x.i === sel.i; }) + Number(b.dataset.nav); if (all[k]) select(all[k].s, all[k].i); });
       on('[data-sec]', 'onclick', function (b) { sel = { s: +b.dataset.sec, i: -1 }; drawPane(); });
@@ -588,6 +609,7 @@
       var pages, size = 'a4';
       try {
         if (view === 'key') pages = M.renderKeyPages(e);
+        else if (view === 'guide') pages = M.renderGuidePages(e);
         else { var sh = M.examSheets(e); pages = sh.items; size = sh.size; }
       } catch (err) { console.error(err); pagesBox.innerHTML = '<div class="alert bad" style="margin:12px">تعذّر بناء المعاينة: ' + esc(err.message) + '</div>'; return; }
       var pw = size === 'a3' ? 1588 : 794, ph = size === 'a3' ? 1153 : 1123;

@@ -666,3 +666,33 @@ body{background:radial-gradient(1200px 500px at 100% -10%,#E7F2EF 0,transparent 
 .gen-t{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:10px;padding:6px 8px;background:#fff;cursor:pointer}
 .gen-t.on{border-color:var(--accent);background:var(--accent-s)}
 .gen-t b{flex:1;font-size:13.5px}.gen-t .inp{width:64px;min-height:34px;padding:4px 6px;text-align:center}
+
+/* ===== دليل التصحيح (لوحة الاستوديو) ===== */
+.gd{display:flex;flex-direction:column;gap:10px}
+.gd-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.gd-out{gap:6px;flex-wrap:wrap}
+.gd-stat{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--soft,transparent)}
+.gd details>summary{cursor:pointer;font-weight:600;padding:6px 0}
+.gd-iss ul,.gd-his ul{margin:4px 0;padding-inline-start:18px;font-size:13px;display:flex;flex-direction:column;gap:3px}
+.gd fieldset{border:0;padding:0;margin:0;min-width:0;display:flex;flex-direction:column;gap:6px}
+.gd fieldset[disabled] .inp{opacity:.85}
+.gd-t{width:100%;border-collapse:collapse;font-size:13px}
+.gd-t th,.gd-t td{border:1px solid var(--line);padding:4px 6px;text-align:center}
+.gd-t tr.sub td,.gd-t tr.tot td{font-weight:700}
+.gd-sh{font-weight:700;margin-top:6px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.gd-it{border:1px solid var(--line);border-radius:10px;padding:0 10px}
+.gd-it[open]{padding-bottom:10px}
+.gd-it>summary{display:flex;gap:8px;align-items:center;list-style:none;padding:8px 0!important;font-weight:400!important}
+.gd-it>summary::-webkit-details-marker{display:none}
+.gd-it>summary .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gd-it>summary .g{font-weight:700;font-size:13px;white-space:nowrap}
+.gd-b{display:flex;flex-direction:column;gap:8px}
+.gd-ans{font-size:13px;padding:6px 8px;border-radius:8px;background:var(--soft,rgba(0,0,0,.03))}
+.gd-steps{display:flex;flex-direction:column;gap:6px}
+.gd-sth{display:flex;justify-content:space-between;gap:8px;font-size:13px}
+.gd-st{display:flex;gap:6px;align-items:center}
+.gd-st .inp:first-child{flex:1;min-width:0}
+.gd-st .gd-g{width:64px;text-align:center}
+.chip.bad{background:#FEE2E2;color:#991B1B}
+.chip.warn{background:#FEF3C7;color:#92400E}
+.warn-t{color:#B45309}

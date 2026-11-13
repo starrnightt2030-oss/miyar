@@ -271,6 +271,40 @@
     return save(doc, 'مفتاح-الإجابة-' + (exam.title || '') + (exam.model ? '-' + exam.model : '') + '.docx');
   };
 
+  /* دليل التصحيح: أبيض وأسود دائماً، وعنوان «خاص بالمصحح» ورقم الإصدار في التذييل */
+  M.exportGuideWord = function (exam) {
+    var g = M.guideOf(exam), approved = g.status === 'approved' && g.frozen, ver = g.ver || 1;
+    var ex = Object.assign({}, exam, { theme: 'official', boldText: false, footerNote: 'خاص بالمصحح — لا يُسلَّم للطلاب · الإصدار ' + ver, showStudent: false, showGradeTable: false, showInstructions: false });
+    var k = mk(exam.digits, ex), L = exam.lang === 'en' ? M.EN_LETTERS : M.AR_LETTERS, c = M._pctx(exam);
+    var kids = headerBlocks(k, ex, null);
+    kids.push(k.para('نموذج الإجابة ودليل التصحيح — خاص بالمصحح', { bold: true, size: 15, center: true, before: 120 }));
+    kids.push(k.para((exam.title || '') + (exam.model ? ' — نموذج (' + exam.model + ')' : '') + ' · الإصدار ' + ver + ' · ' + (approved ? 'معتمد' + (g.approvedAt ? ' ' + M.fmtDate(g.approvedAt) : '') : 'مسودة غير معتمدة') + ' · الدرجة الكلية ' + M.examTotal(exam), { center: true, size: 11, after: 120 }));
+    var pol = (approved ? g.frozen.policy : g.policy) || {};
+    M.GUIDE_POLICY.forEach(function (p) { if (String(pol[p[0]] || '').trim()) kids.push(k.para([k.run(p[1] + ': ', { bold: true, size: 11 })].concat(k.richRuns(pol[p[0]], { size: 11 })), { after: 40 })); });
+    var rows = M.guideRows(exam), lastS = -1, W = [7666, 1800];
+    rows.forEach(function (r) {
+      if (r.s !== lastS) { lastS = r.s; kids.push(k.para('السؤال ' + M.ordinal(r.main) + (r.part >= 0 ? ' (' + M.partLabel(exam, r.part) + ')' : '') + ': ' + (r.sec.title || (M.TYPE[r.sec.type] || {}).title || '') + ' — ' + M.gradeWord(M.sectionGrade(exam, r.sec)), { bold: true, before: 160, bottomLine: true, keepNext: true })); }
+      var x = r.x || {}, a = M.guideAnswer(exam, r, c, L), qt = String(r.q.text || '').replace(/\[\[(.+?)\]\]/g, '……'); if (qt.length > 220) qt = qt.slice(0, 217) + '…';
+      kids.push(k.para([k.run((r.i + 1) + ') ', { bold: true })].concat(k.richRuns(qt)).concat([k.run('   (' + M.gradeWord(r.grade) + ')', { bold: true, size: 11 })]), { before: 80, keepNext: true }));
+      if (r.stale) kids.push(k.para('⚠ تغيّر هذا الفرع بعد ' + (approved ? 'اعتماد الدليل' : 'كتابة التوزيع') + ' — يحتاج مراجعة', { bold: true, size: 11, keepNext: true }));
+      kids.push(k.para([k.run('الإجابة: ', { bold: true })].concat(k.richRuns(a.text.replace(/\[\[(.+?)\]\]/g, '$1'))), { keepNext: !!(x.steps && x.steps.length) }));
+      if (String(x.answer || '').trim()) kids.push(k.para([k.run('الإجابة النموذجية المفصلة: ', { bold: true })].concat(k.richRuns(String(x.answer).replace(/\[\[(.+?)\]\]/g, '$1')))));
+      if (x.steps && x.steps.length) {
+        var tr = [[k.cell('عناصر الإجابة / خطوات الحل', { w: W[0], bold: true, size: 11 }), k.cell('الدرجة', { w: W[1], bold: true, size: 11, center: true })]];
+        x.steps.forEach(function (s) { tr.push([k.cell(String(s.t || ''), { w: W[0], size: 11 }), k.cell(String(Number(s.g) || 0), { w: W[1], center: true, size: 11 })]); });
+        tr.push([k.cell('المجموع', { w: W[0], bold: true, size: 11 }), k.cell(M.stepsSum(x) + ' من ' + r.grade, { w: W[1], bold: true, center: true, size: 11 })]);
+        kids.push(k.table(tr, W));
+      }
+      M.GUIDE_FIELDS.forEach(function (f) { var v = String(x[f[0]] || '').trim(); if (v) kids.push(k.para([k.run(f[1] + ': ', { bold: true, size: 11 })].concat(k.richRuns(f[0] === 'alts' ? v.split('\n').join(' · ') : v, { size: 11 })), { after: 30 })); });
+      if (x.src === 'ai' && !x.rev && !approved) kids.push(k.para('(توزيع مقترح من الذكاء الاصطناعي — لم يُراجع)', { size: 10 }));
+    });
+    var t = M.guideTotals(exam, rows);
+    kids.push(k.para('مطابقة الدرجات: ' + t.groups.map(function (gr) { return 'س' + (gr.main + 1) + ' = ' + gr.dist; }).join(' · ') + ' · المجموع ' + t.dist + ' من ' + t.want + (t.ok ? ' ✓' : ' ⚠'), { bold: true, before: 200, bottomLine: true }));
+    kids.push(k.table([[k.cell('المصحح: ………………', { w: 3155 }), k.cell('المراجع: ………………', { w: 3155 }), k.cell('رئيس اللجنة: ………………', { w: 3156 })]], [3155, 3155, 3156], { noBorder: true }));
+    var doc = new k.d.Document({ creator: 'Exam Studio — Mohamed-Eldawly', sections: [{ properties: pageProps(), footers: { default: footer(k, ex) }, children: kids }] });
+    return save(doc, 'دليل-التصحيح-' + (exam.title || '') + (exam.model ? '-' + exam.model : '') + '-إصدار' + ver + '.docx');
+  };
+
   M.exportSpecWord = function (exam) {
     var k = mk(exam.digits), dd = M.specData(exam);
     var kids = headerBlocks(k, Object.assign({}, exam, { showStudent: false, showGradeTable: false, showInstructions: false }), null);

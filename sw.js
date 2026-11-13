@@ -1,5 +1,5 @@
 /* معيار — Service Worker (مولَّد تلقائياً بواسطة tools/release.js — لا تعدّله يدوياً) */
-var VERSION = '2.3.0';
+var VERSION = '2.4.0';
 var CACHE = 'miyar-' + VERSION;
 var FILES = [
   "./config.json",
@@ -36,6 +36,7 @@ var FILES = [
   "./js/extract.js",
   "./js/generate.js",
   "./js/generator.js",
+  "./js/guide.js",
   "./js/identity.js",
   "./js/imgtools.js",
   "./js/import.js",
@@ -68,9 +69,6 @@ var FILES = [
   "./vendor/docx.umd.js",
   "./vendor/supabase.js",
   "./vendor/xlsx.full.min.js",
-  "./x/gen-lib.png",
-  "./x/gen-review.png",
-  "./x/gen-setup.png",
   "./"
 ];
 

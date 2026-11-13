@@ -220,7 +220,7 @@
     var t = st.levelTargets || [30, 40, 20, 10];
     main.innerHTML = M.topbar('الإعدادات', 'الإصدار ' + n(M.VERSION)) + '<div class="content">' +
       '<div class="about-card"><img src="icons/icon-192.png" alt="" width="64" height="64"><div class="ab-t"><b>Exam Studio</b><span>استوديو الامتحانات · الإصدار <span class="p-code">' + esc(M.VERSION) + '</span></span></div>' + M.creditHTML() + '</div>' +
-      (M.isAndroidApp ? '' : '<a class="btn apk-dl" href="https://github.com/starrnightt2030-oss/miyar/releases/latest/download/ExamStudio.apk" rel="noopener"><span class="apk-ic" aria-hidden="true">▼</span> تحميل تطبيق أندرويد (APK)</a>') +
+      (M.isAndroidApp ? '<div class="row" style="align-items:center;gap:8px"><span class="chip">تطبيق الأندرويد ' + '<span class="p-code">1.0.' + M.apkCode() + '</span>' + '</span><button class="btn sm" id="st-apk">' + I('download', 16) + ' فحص تحديث التطبيق</button></div>' : '<a class="btn apk-dl" href="https://github.com/starrnightt2030-oss/miyar/releases/latest/download/ExamStudio.apk" rel="noopener"><span class="apk-ic" aria-hidden="true">▼</span> تحميل تطبيق أندرويد (APK)</a>') +
       '<div class="row mob-only"><a class="btn" href="#/identity">' + I('grid') + ' هوية المؤسسة</a><a class="btn" href="#/docs">' + I('docs') + ' وثائق الجودة</a></div>' +
       '<div class="card"><div class="card-h"><h2 class="grow">الإصدار والتحديثات</h2><span class="chip ok">الإصدار <span class="p-code">' + esc(M.VERSION) + '</span></span></div>' +
       '<div class="small muted" style="margin-bottom:10px">التحديثات إجبارية: عند نشر إصدار جديد يظهر تنبيه صوتي ونافذة تحديث فوراً عند فتح التطبيق أو أثناء استخدامه (يُفحص كل ٣ دقائق)، ومع تفعيل الإشعارات يصلك إشعار حتى والتطبيق مغلق.' + (st.lastUpdateCheck ? ' آخر فحص: ' + n(M.fmtDate(st.lastUpdateCheck, true)) : '') + '</div>' +
@@ -280,6 +280,7 @@
       var box = M.qs('#st-safety', main); if (!box) return;
       box.innerHTML = M.safetySettingsHTML(r[0], r[1], r[2]); M.bindSafetySettings(box, r[2]);
     });
+    var sa = M.qs('#st-apk', main); if (sa) sa.onclick = function () { M.checkApk(true); };
     M.qs('#st-bk', main).onclick = function () { M.backup().then(function () { M.toast('تم تنزيل النسخة الاحتياطية', 'ok'); }); };
     M.qs('#st-rs', main).onclick = M.restoreFlow;
     var xl = M.qs('#st-xl', main); if (xl) xl.onclick = function () { M.exportBankExcel(S.questions.filter(function (q) { return q.status !== 'archived'; }), 'بنك-الأسئلة-كاملاً'); };

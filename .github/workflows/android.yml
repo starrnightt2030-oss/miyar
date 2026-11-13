@@ -19,7 +19,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
-      - name: مفتاح التوقيع (من Secrets لو موجود، وإلا مفتاح مؤقت)
+      - name: مفتاح التوقيع الثابت (من Secrets)
         env:
           KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
           KS_SECRET: ${{ secrets.ANDROID_KS_PASS }}
@@ -27,11 +27,14 @@ jobs:
           if [ -n "$KS_B64" ] && [ -n "$KS_SECRET" ]; then
             echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/ks.jks"
             echo "KS_PASS=$KS_SECRET" >> "$GITHUB_ENV"
+            echo "STABLE=1" >> "$GITHUB_ENV"
           else
-            echo "::warning::لا يوجد مفتاح توقيع في Secrets — سيُستخدم مفتاح مؤقت"
+            # بدون المفتاح الثابت: نبني للتجربة فقط ولا ننشر — حتى لا يصل للناس APK لا يثبت فوق نسختهم
+            echo "::warning::لا يوجد ANDROID_KEYSTORE_B64 و ANDROID_KS_PASS في Secrets — بناء تجريبي بدون نشر"
             P=$(openssl rand -hex 16); echo "::add-mask::$P"
             keytool -genkeypair -keystore "$RUNNER_TEMP/ks.jks" -alias examstudio -keyalg RSA -keysize 2048 -validity 36500 -storepass "$P" -keypass "$P" -dname "CN=Mohamed-Eldawly, O=Exam Studio, C=EG"
             echo "KS_PASS=$P" >> "$GITHUB_ENV"
+            echo "STABLE=0" >> "$GITHUB_ENV"
           fi
           echo "KS_FILE=$RUNNER_TEMP/ks.jks" >> "$GITHUB_ENV"
       - name: بناء APK
@@ -47,6 +50,7 @@ jobs:
           name: ExamStudio-apk
           path: ExamStudio.apk
       - name: نشر في Releases
+        if: env.STABLE == '1'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-v1.0.${{ github.run_number }}
@@ -54,6 +58,7 @@ jobs:
           body: |
             تطبيق Exam Studio للأندرويد.
             حمّل ExamStudio.apk وثبّته (اسمح بالتثبيت من مصادر غير معروفة).
-            التطبيق يتحدّث تلقائياً مع نسخة GitHub — مش محتاج تنزّل APK جديد مع كل تحديث.
+            موقّع بمفتاح ثابت: كل نسخة جديدة تتثبت فوق القديمة وبياناتك تفضل زي ما هي.
+            محتوى التطبيق (الامتحانات والمميزات) يتحدّث تلقائياً من GitHub، والتطبيق نفسه بينبهك لو فيه APK أحدث.
           files: ExamStudio.apk
           make_latest: true

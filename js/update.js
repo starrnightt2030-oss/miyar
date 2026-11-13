@@ -158,4 +158,38 @@
       return '<div style="padding:8px 0;border-bottom:1px solid #EEF0F4"><div class="row"><b>الإصدار ' + esc(c.v) + '</b><span class="small muted">' + n(c.date) + '</span>' + (c.v === M.VERSION ? '<span class="chip ok">الحالي</span>' : '') + '</div><ul style="margin:4px 0 0;padding-inline-start:20px" class="small">' + c.notes.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>';
     }).join('');
   };
+
+  /* ===== تحديث تطبيق الأندرويد (APK) =====
+     محتوى التطبيق يتحدث من GitHub تلقائياً؛ هنا ننبه فقط لو صدر APK أحدث من المثبت.
+     النسخ 1.0.1 و1.0.2 موقعة بمفتاح مؤقت ولا تعرف رقمها، فتحتاج حذفاً مرة أخيرة بعد نسخة احتياطية */
+  M.APK_URL = 'https://github.com/starrnightt2030-oss/miyar/releases/latest/download/ExamStudio.apk';
+  M.apkCode = function () {
+    var a = window.ExamStudioAndroid; if (!a) return 0;
+    try { return a.appVersion ? Number(a.appVersion()) || 0 : 2; } catch (e) { return 2; }
+  };
+  M.checkApk = function (manual) {
+    if (!M.isAndroidApp || !navigator.onLine) { if (manual) M.toast('يحتاج اتصالاً بالإنترنت', 'bad'); return Promise.resolve(null); }
+    var last = 0; try { last = Number(localStorage.getItem('apk-chk')) || 0; } catch (e) { /* */ }
+    if (!manual && Date.now() - last < 6 * 3600 * 1000) return Promise.resolve(null);
+    return fetch('https://api.github.com/repos/starrnightt2030-oss/miyar/releases/latest', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (rel) {
+      try { localStorage.setItem('apk-chk', String(Date.now())); } catch (e) { /* */ }
+      var m = rel && /android-v\d+\.\d+\.(\d+)/.exec(rel.tag_name || ''); if (!m) return null;
+      var latest = Number(m[1]), mine = M.apkCode();
+      if (latest <= mine) { if (manual) M.toast('تطبيق الأندرويد محدّث (1.0.' + mine + ')', 'ok'); return null; }
+      var skip = ''; try { skip = localStorage.getItem('apk-skip') || ''; } catch (e) { /* */ }
+      if (!manual && skip === String(latest)) return null;
+      var legacy = mine <= 2;
+      M.modal({ title: 'تحديث تطبيق الأندرويد متاح', body:
+        '<p style="margin:0 0 8px">صدرت نسخة جديدة من التطبيق (' + '<span class="p-code">1.0.' + latest + '</span>' + ').</p>' +
+        (legacy ? '<div class="alert warn" style="margin-bottom:8px">' + I('warn') + '<div><b>مرة أخيرة فقط:</b> نسختك القديمة موقعة بمفتاح مؤقت، فالجديدة لن تتثبت فوقها.<br>١) خذ <b>نسخة احتياطية</b> الآن.<br>٢) احذف التطبيق القديم وثبّت الجديد.<br>٣) استعد النسخة الاحتياطية.<br>بعدها كل التحديثات هتتثبت فوق التطبيق مباشرة.</div></div>'
+          : '<p class="small muted" style="margin:0">حمّل الملف وافتحه واضغط «تحديث» — هيتثبت فوق التطبيق وبياناتك تفضل زي ما هي.</p>'),
+        foot: (legacy ? '<button class="btn" data-bk>' + I('download', 16) + ' نسخة احتياطية</button>' : '') + '<a class="btn pri" data-dl href="' + M.APK_URL + '" rel="noopener">' + I('download', 16) + ' تحميل التحديث</a><button class="btn" data-x>لاحقاً</button>',
+        onMount: function (mm) {
+          var bk = mm.querySelector('[data-bk]'); if (bk) bk.onclick = function () { M.backup().then(function () { M.toast('تم حفظ النسخة الاحتياطية في التنزيلات', 'ok'); }); };
+          mm.querySelector('[data-x]').addEventListener('click', function () { try { localStorage.setItem('apk-skip', String(latest)); } catch (e) { /* */ } });
+        } });
+      return latest;
+    }).catch(function () { if (manual) M.toast('تعذّر الفحص — حاول لاحقاً', 'bad'); return null; });
+  };
+  if (M.isAndroidApp) setTimeout(function () { M.checkApk(false); }, 6000);
 })(window.M);

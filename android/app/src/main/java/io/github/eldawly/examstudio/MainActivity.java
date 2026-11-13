@@ -281,6 +281,12 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String platform() { return "android"; }
+
+        /* رقم إصدار التطبيق (versionCode) — لتنبيه المستخدم عند وجود APK أحدث */
+        @JavascriptInterface
+        public int appVersion() {
+            try { return (int) getPackageManager().getPackageInfo(getPackageName(), 0).versionCode; } catch (Exception e) { return 0; }
+        }
     }
 
     @Override

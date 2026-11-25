@@ -40,7 +40,10 @@
     return exam.sections.reduce(function (s, sec) { return s + M.sectionGrade(exam, sec); }, 0);
   };
 
+  /* ورقة أسئلة فقط (الإجابة في كراسة منفصلة): لا سطور ولا مربعات رسم ولا دوائر اختيار ولا أقواس صح/خطأ */
+  var BOOK = false;
   function ctx(exam) {
+    BOOK = M.isBooklet(exam);
     var en = exam.lang === 'en';
     var mode = exam.digits || 'arabic';
     var T = function (s) { return M.digits(M.esc(s), mode); };
@@ -82,6 +85,37 @@
       '<span class="t2">مادة ' + c.T(M.examSubject(e)) + '</span>' +
       '<span class="t3">العام الدراسي ' + c.T(e.year || M.S.settings.year) + '</span></div>' +
       (showDoc ? '<div class="p-doc">' + docRows + '</div>' : c3) + '</div>';
+  }
+
+  /* ===== ورقة امتحان رسمي (نصف العام / آخر العام) =====
+     بلا اسم الطالب ولا رقم الجلوس: ترويسة واحدة مضغوطة = الشعار وبيانات المؤسسة · عنوان الامتحان · وثيقة الجودة،
+     ثم شريط واحد: المادة · الصف · التخصص · التاريخ · الزمن · الدرجة الكلية · عدد الصفحات */
+  M.isTermPaper = function (e) { return !!e && e.paperKind === 'term'; };
+  M.isBooklet = function (e) { return !!e && e.answerIn === 'booklet'; };
+  function termHeadHTML(c, pageNoPh, pagesPh) {
+    var e = c.exam, cen = M.S.settings.center || {};
+    var doc = e.docId ? M.byId('docs', e.docId) : M.docFor('exam');
+    var showDoc = e.showDoc !== false && !!doc;
+    var lines = (cen.lines || []).filter(function (x) { return String(x || '').trim(); });
+    var logo = cen.logo ? '<div class="p-logo has"><img src="' + cen.logo + '" alt="شعار المؤسسة"></div>' : '<div class="p-logo">شعار</div>';
+    var nameBlock = lines.length ? '<div class="p-lines-id">' + lines.map(function (l, i) { return i === lines.length - 1 ? '<b>' + c.T(l) + '</b>' : '<span>' + c.T(l) + '</span>'; }).join('') + '</div>'
+      : '<div class="p-lines-id"><b>' + (c.T(cen.name) || '[اسم المؤسسة]') + '</b>' + (cen.directorate ? '<span>' + c.T(cen.directorate) + '</span>' : '') + '</div>';
+    var side = showDoc
+      ? '<div class="p-doc">' +
+        '<span class="k">كود الوثيقة</span><span><span class="p-code">' + M.esc(doc.code) + '</span></span>' +
+        '<span class="k">الإصدار</span><span>' + c.num(doc.version) + ' — ' + c.num(M.fmtDate(doc.issueDate)) + '</span>' +
+        '<span class="k">التعديل</span><span>' + c.num(doc.revision || '00') + (doc.revisionDate ? ' — ' + c.num(M.fmtDate(doc.revisionDate)) : '') + '</span>' +
+        '<span class="k">الصفحة</span><span>' + pageNoPh + '</span></div>'
+      : '<div class="c3">' + (cen.logo2 ? '<div class="p-logo has"><img src="' + cen.logo2 + '" alt=""></div>' : '') + '</div>';
+    var f = function (k, v, wide) { return '<span class="f' + (wide ? ' w' : '') + '"><i>' + k + '</i>' + (v ? '<b>' + v + '</b>' : '<u></u>') + '</span>'; };
+    var date = e.examDate ? c.num(M.fmtDate(e.examDate)) : '';
+    var data = f('المادة', c.T(M.examSubject(e)), true) + f('الصف', c.T(e.className)) + (e.specialization ? f('التخصص', c.T(e.specialization)) : '') +
+      f('التاريخ', date) + f('الزمن', c.T(e.duration)) + f('الدرجة الكلية', c.T(M.gradeWord(e.totalGrade || M.examTotal(e)))) + f('عدد الصفحات', pagesPh);
+    return '<div class="pblock p-thead' + (showDoc ? '' : ' nodoc') + '"><div class="th-top">' +
+      '<div class="c1">' + logo + nameBlock + '</div>' +
+      '<div class="c2"><b class="t1">' + c.T(e.title || 'امتحان') + '</b>' +
+      '<span class="t3">العام الدراسي ' + c.T(e.year || M.S.settings.year) + (e.model ? ' — نموذج (' + c.T(e.model) + ')' : '') + '</span></div>' +
+      side + '</div><div class="th-data">' + data + '</div></div>';
   }
 
   function infoHTML(c, pagesPh) {
@@ -184,6 +218,7 @@
   }
   M._ansArea = ansArea;
   function solLines(q) {
+    if (BOOK) return '';
     var k = Math.max(0, Math.min(30, Number(q.solLines) || 0)); if (!k) return '';
     return ansArea(k, !!q.ansGrid, 'p-sol');
   }
@@ -212,10 +247,10 @@
     var e = c.exam, h = '';
     var its = sec.items.slice(from, to);
     if (sec.type === 'tf') {
-      h += '<div class="p-tf">';
+      h += '<div class="p-tf' + (BOOK ? ' nb' : '') + '">';
       its.forEach(function (it, k) {
         var q = M.itemQ(e, it); if (!q) return;
-        h += '<span data-q="' + q.id + '">' + c.num(from + k + 1) + '</span><span data-q="' + q.id + '">' + place(q, c.rich(q.text), '') + '</span><span data-q="' + q.id + '">(&nbsp;&nbsp;&nbsp;&nbsp;)</span>';
+        h += '<span data-q="' + q.id + '">' + c.num(from + k + 1) + '</span><span data-q="' + q.id + '">' + place(q, c.rich(q.text), '') + '</span>' + (BOOK ? '' : '<span data-q="' + q.id + '">(&nbsp;&nbsp;&nbsp;&nbsp;)</span>');
       });
       return h + '</div>';
     }
@@ -225,9 +260,9 @@
       h += '<div class="p-match"><span class="hd">' + (c.en ? 'Column (A)' : 'العمود (أ)') + '</span><span></span><span class="hd">' + (c.en ? 'Column (B)' : 'العمود (ب)') + '</span>';
       for (var r = 0; r < rows; r++) {
         var a = ml.A[r], b = ml.B[r];
-        h += a ? '<span class="a"><span>' + c.num(r + 1) + ') ' + c.rich(a.a) + '</span><span>●</span></span>' : '<span></span>';
+        h += a ? '<span class="a"><span>' + c.num(r + 1) + ') ' + c.rich(a.a) + '</span>' + (BOOK ? '' : '<span>●</span>') + '</span>' : '<span></span>';
         h += '<span></span>';
-        h += b ? '<span class="b">● (' + c.L[r] + ') ' + c.rich(b.text) + '</span>' : '<span></span>';
+        h += b ? '<span class="b">' + (BOOK ? '' : '● ') + '(' + c.L[r] + ') ' + c.rich(b.text) + '</span>' : '<span></span>';
       }
       return h + '</div>';
     }
@@ -239,7 +274,7 @@
         var opts = order.map(function (i) { return q.options[i]; });
         var oc = sec.optCols && sec.optCols !== 'auto' ? 'c' + sec.optCols : (sec.layout === 'two' || q.figurePos === 'side' || q.figurePos === 'side-start' ? (optCols(opts) === 'c1' ? 'c1' : 'c2') : optCols(opts));
         var oh = '<div class="p-opts ' + oc + '">';
-        opts.forEach(function (o, j) { oh += '<span><i class="ring"></i>' + c.L[j] + ') ' + c.rich(o) + '</span>'; });
+        opts.forEach(function (o, j) { oh += '<span>' + (BOOK ? '' : '<i class="ring"></i>') + c.L[j] + ') <span class="ot">' + c.rich(o) + '</span></span>'; });
         h += '<div class="p-item" data-q="' + q.id + '">' + place(q, '<div class="st">' + (sec.items.length === 1 ? '' : itemNo(c, from + k + 1)) + '<span>' + c.rich(q.text) + '</span></div>', oh + '</div>') + '</div>';
       });
       return h + '</div>';
@@ -259,12 +294,12 @@
       } else if (sec.type === 'image') {
         h += '<div class="p-item" data-q="' + q.id + '"><div class="st">' + no + '<span>' + c.rich(q.text) + '</span></div><div class="p-img">' +
           (q.image ? '<img src="' + q.image + '" alt="">' : '') + '<div class="lbls">' +
-          q.labels.map(function (l) { return '<span>' + c.T(l.n) + '</span><span>…………………………</span>'; }).join('') + '</div></div></div>';
+          (BOOK ? '' : q.labels.map(function (l) { return '<span>' + c.T(l.n) + '</span><span>…………………………</span>'; }).join('')) + '</div></div></div>';
       } else if (sec.type === 'draw') {
         h += '<div class="p-item" data-q="' + q.id + '">' + place(q, '<div class="st">' + no + '<span>' + c.rich(q.text) + '</span></div>',
-          '<div class="p-draw' + (q.drawGrid !== false ? ' grid' : '') + '" style="height:' + (Number(q.drawHeight) || 140) + 'px"></div>') + '</div>';
+          BOOK ? '' : '<div class="p-draw' + (q.drawGrid !== false ? ' grid' : '') + '" style="height:' + (Number(q.drawHeight) || 140) + 'px"></div>') + '</div>';
       } else {
-        var lines = Math.max(0, Number(q.lines) || 0);
+        var lines = BOOK ? 0 : Math.max(0, Number(q.lines) || 0);
         var pre = sec.type === 'reason' && !/^\s*علل/.test(q.text) && !c.en ? '' : '';
         h += '<div class="p-item" data-q="' + q.id + '">' + place(q, '<div class="st">' + no + '<span>' + pre + c.rich(q.text) + '</span></div>', lines ? ansArea(lines, !!q.ansGrid) : '') + '</div>';
       }
@@ -345,7 +380,7 @@
 
   function pageShell(c) {
     var e = c.exam, ty = M.typo(e);
-    var cls = 'page' + (c.en ? ' ltr' : '') + (!ty.v2 && e.compact && !e.largePrint ? ' compact' : '') + (!ty.v2 && e.largePrint ? ' large' : '') + (ty.v2 ? ' v2 ty-' + ty.typo : '') + (e.separator === 'dashed' ? ' sep-dashed' : '') + (e.boldText ? ' bold-all' : '') + ' th-' + (e.theme || 'classic') + (M.BW_THEMES.indexOf(e.theme) >= 0 ? ' bw' : '');
+    var cls = 'page' + (c.en ? ' ltr' : '') + (!ty.v2 && e.compact && !e.largePrint ? ' compact' : '') + (!ty.v2 && e.largePrint ? ' large' : '') + (ty.v2 ? ' v2 ty-' + ty.typo : '') + (e.separator === 'dashed' ? ' sep-dashed' : '') + (e.boldText ? ' bold-all' : '') + ' th-' + (e.theme || 'classic') + (M.BW_THEMES.indexOf(e.theme) >= 0 ? ' bw' : '') + (e.density === 'compact' ? ' dn-compact' : '') + (M.isBooklet(e) ? ' ans-booklet' : '') + (M.isTermPaper(e) ? ' k-term' : '');
     var style = '--pc:' + (e.color || '#1F2A44') + ';' + (ty.v2 ? '--pfs:' + ty.pt + 'pt;' : (e.compact || e.largePrint ? '' : '--pfs:' + (Number(e.fontSize) || 14) + 'px;')) +
       (e.font ? '--pfont:' + e.font + ';' : '');
     var el = document.createElement('div');
@@ -394,10 +429,15 @@
       el.remove(); addHTML(html); return true;
     }
     newPage();
-    addHTML(headerHTML(c, '<b data-pn></b>&nbsp;من&nbsp;<b data-pt></b>'));
-    addHTML(infoHTML(c, '<b data-pt></b>'));
-    addHTML(studentHTML(c));
-    if (exam.showGradeTable !== false && exam.sections.length) addHTML(gradesHTML(c));
+    var booklet = M.isBooklet(exam);
+    if (M.isTermPaper(exam)) addHTML(termHeadHTML(c, '<b data-pn></b>&nbsp;من&nbsp;<b data-pt></b>', '<b data-pt></b>'));
+    else {
+      addHTML(headerHTML(c, '<b data-pn></b>&nbsp;من&nbsp;<b data-pt></b>'));
+      addHTML(infoHTML(c, '<b data-pt></b>'));
+      addHTML(studentHTML(c));
+    }
+    /* ورقة الأسئلة فقط: لا جدول درجات ولا توقيعات (التصحيح في كراسة الإجابة) */
+    if (!booklet && exam.showGradeTable !== false && exam.sections.length) addHTML(gradesHTML(c));
     if (exam.showInstructions !== false && exam.instructions) addHTML('<div class="pblock p-instr">' + c.T(exam.instructions) + '</div>');
 
     exam.sections.forEach(function (sec, idx) {
@@ -442,7 +482,7 @@
     });
 
     var total = pages.length;
-    var signHTML = exam.showSign !== false ? '<div class="p-sign"><span>توقيع المصحح</span><span>توقيع المراجع</span><span>رئيس اللجنة</span></div>' : '';
+    var signHTML = exam.showSign !== false && !M.isBooklet(exam) ? '<div class="p-sign"><span>توقيع المصحح</span><span>توقيع المراجع</span><span>رئيس اللجنة</span></div>' : '';
     pages.forEach(function (p, i) {
       M.qsa('[data-pn]', p).forEach(function (x) { x.textContent = c.num(i + 1); });
       M.qsa('[data-pt]', p).forEach(function (x) { x.textContent = c.num(total); });

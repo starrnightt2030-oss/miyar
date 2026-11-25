@@ -438,3 +438,79 @@ u.ans{text-decoration:none;border-bottom:1.5px solid #1D4ED8;color:#1E3A8A;paddi
 .g-sum{margin-top:8px;font-size:12px;border-top:1.5px solid #000;padding-top:4px}
 .v2 .g-it,.v2 .g-title span{font-size:10pt}
 .v2 .g-f,.v2 .g-st,.v2 .g-sum,.v2 .g-pol{font-size:9.5pt}
+
+/* ===================== امتحان رسمي (نصف العام / آخر العام) ===================== */
+.p-thead{border:1.5px solid var(--pc,#1F2A44);border-radius:6px;overflow:hidden}
+.p-thead .th-top{display:grid;grid-template-columns:1.05fr 1.2fr 1fr;align-items:stretch}
+.p-thead .c1{display:flex;align-items:center;gap:8px;padding:4px 8px;min-width:0}
+.p-thead .p-logo{width:50px;height:50px;font-size:9px}
+.p-thead .p-lines-id{line-height:1.35;font-size:9.5pt}
+.p-thead .p-lines-id b{font-size:10.5pt}
+.p-thead .c2{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:4px 6px;border-inline:1.5px solid var(--pc,#1F2A44);text-align:center;line-height:1.35}
+.p-thead .c2 .t1{font-size:13.5pt;font-weight:700;color:var(--pc,#1F2A44)}
+.p-thead .c2 .t3{font-size:10pt;color:#374151}
+.p-thead .p-doc{font-size:8.5pt;line-height:1.3}
+.p-thead .p-doc span{padding:1.5px 6px}
+.p-thead .c3{display:flex;align-items:center;justify-content:center;padding:4px}
+.p-thead.nodoc .th-top{grid-template-columns:1.1fr 1.3fr .6fr}
+.p-thead .th-data{display:flex;flex-wrap:wrap;border-top:1.5px solid var(--pc,#1F2A44);font-size:10.5pt;line-height:1.4}
+.p-thead .th-data .f{flex:1 1 auto;display:flex;align-items:baseline;gap:5px;padding:3px 8px;white-space:nowrap}
+.p-thead .th-data .f.w{flex-grow:1.6}
+.p-thead .th-data .f+.f{border-inline-start:1px solid #C9CED8}
+.p-thead .th-data i{font-style:normal;color:#4B5563;font-size:.9em}
+.p-thead .th-data b{font-weight:700}
+.p-thead .th-data u{flex:1;min-width:52px;border-bottom:1px dotted #374151;text-decoration:none;height:1em}
+.bw .p-thead .th-data i,.bw .p-thead .c2 .t3{color:#000}
+.bw .p-thead .th-data .f+.f{border-color:#555}
+.th-frame .p-thead,.th-economy .p-thead{border-radius:0}
+
+/* ورقة أسئلة فقط: صح/خطأ بعمودين */
+.p-tf.nb{grid-template-columns:28px 1fr}
+.v2 .p-tf.nb{grid-template-columns:2.1em 1fr}
+.p-tf.nb span{border-inline-start:0!important;text-align:start!important}
+.p-tf.nb span:nth-last-child(-n+3){border-bottom:1px solid #E5E7EB}
+.p-tf.nb span:nth-last-child(-n+2){border-bottom:0}
+
+/* ===================== مسافات مضغوطة (موفرة للورق) =====================
+   هوامش أقل، ترويسة أصغر، مسافة أقل بين الأسئلة والفروع، وتباعد أسطر مريح للقراءة (1.45)
+   — سطور الإجابة المكتوبة تبقى بارتفاع مناسب للكتابة اليدوية */
+.page.dn-compact{padding:22px 30px 14px;--plh:1.45;--pgap:5px}
+.page.dn-compact.ty-comfort{--plh:1.6;--pgap:7px}
+.page.dn-compact.ty-large{--plh:1.55;--pgap:7px}
+.dn-compact .p-head .c1{padding:4px 8px;gap:8px}
+.dn-compact .p-head .c2{padding:4px 6px;line-height:1.35}
+.dn-compact .p-head .c2 .t1{font-size:13.5pt}
+.dn-compact .p-head .c2 .t2{font-size:11.5pt}
+.dn-compact .p-head .c2 .t3{font-size:10pt}
+.dn-compact .p-logo{width:50px;height:50px}
+.dn-compact .p-logo.big{width:56px;height:56px}
+.dn-compact .p-lines-id{line-height:1.35}
+.dn-compact .p-doc{font-size:8.5pt;line-height:1.3}
+.dn-compact .p-doc span{padding:1.5px 6px}
+.dn-compact .p-info span{padding:2px 8px}
+.dn-compact .p-data .f{padding:2px 8px}
+.dn-compact .p-grades span{padding:1px 2px;min-height:17px}
+.dn-compact .p-instr{padding:1px 8px}
+.dn-compact .p-sec{gap:2px}
+.dn-compact .p-sec-h{padding-bottom:1px}
+.dn-compact .p-part-h{margin:3px 0 1px}
+.dn-compact .p-item{gap:1px}
+.dn-compact .p-sec.sep-space .p-item{margin-bottom:3px}
+.dn-compact .p-sec.sep-dotted .p-item,.dn-compact .p-sec.sep-line .p-item{padding-bottom:3px;margin-bottom:3px}
+.dn-compact .p-sec.sep-box .p-item{padding:3px 8px;margin-bottom:3px}
+.dn-compact .p-mcq,.dn-compact .p-sec.sep-space .p-mcq,.dn-compact .p-sec.sep-box .p-mcq{gap:3px}
+.dn-compact .p-opts{gap:0 12px}
+.dn-compact .p-tf span{padding:0 6px}
+.dn-compact .p-bank{padding:0 18px;gap:4px 18px}
+.dn-compact .p-lines{gap:0}
+.dn-compact .p-lines i{height:calc(var(--pfs,14px) * 1.6)}
+.dn-compact.ty-large .p-lines i{height:calc(var(--pfs) * 1.7)}
+.dn-compact .p-fig{margin:2px 0}
+.dn-compact .p-cont{margin-top:3px}
+.dn-compact .p-end{margin-top:4px}
+.dn-compact .p-sign{margin-top:6px}
+.dn-compact .p-foot{padding-top:3px;margin-top:3px}
+.dn-compact .p-mini{padding:2px 10px}
+.v2.dn-compact.ty-comfort .p-sec.sep-space .p-item{margin-bottom:5px}
+.v2.dn-compact.ty-comfort .p-mcq{gap:5px}
+.p-opts .ot{unicode-bidi:isolate}

@@ -29,6 +29,9 @@
     var LINE = TY.v2 ? ({ normal: 300, comfort: 360, large: 330 }[TY.typo] || 300) : 300;
     if (exam && ['economy'].indexOf(exam.theme) >= 0) LINE = Math.max(276, LINE - 24);
     if (exam && ['comfort'].indexOf(exam.theme) >= 0) LINE = Math.max(LINE, 360);
+    /* المسافات المضغوطة: نصف المسافات قبل وبعد الفقرات وتباعد أسطر أقل */
+    var DN = !!(exam && exam.density === 'compact');
+    if (DN) LINE = Math.max(276, Math.round(LINE * 0.92));
     var fixed = false, BW = !!(exam && M.BW_THEMES && M.BW_THEMES.indexOf(exam.theme) >= 0);
     var SZ = function (s) { return Math.round((s || 12) * (fixed ? (TY.v2 ? 1 : SC) : SC) * 2); };
     var run = function (text, o) {
@@ -52,7 +55,7 @@
       return new d.Paragraph({
         children: children, bidirectional: true,
         alignment: o.center ? d.AlignmentType.CENTER : undefined, keepNext: !!o.keepNext, keepLines: true,
-        spacing: { before: o.before || 0, after: o.after == null ? 60 : o.after, line: o.line || LINE },
+        spacing: { before: Math.round((o.before || 0) * (DN ? 0.6 : 1)), after: Math.round((o.after == null ? 60 : o.after) * (DN ? 0.6 : 1)), line: o.line || LINE },
         border: o.bottomLine ? { bottom: { style: d.BorderStyle.SINGLE, size: 8, color: BW ? '000000' : '1F2A44', space: 2 } } : undefined
       });
     };
@@ -84,9 +87,14 @@
     var sub = M.byId('subjects', exam.subjectId);
     var c1 = [];
     if (logoImg) c1.push(new d.Paragraph({ children: [new d.ImageRun({ data: logoImg.bytes, transformation: { width: logoImg.w, height: logoImg.h } })], alignment: d.AlignmentType.CENTER }));
-    c1.push(k.para(cen.name || '[اسم مركز التدريب]', { bold: true, center: true, after: 0 }));
-    if (cen.directorate) c1.push(k.para(cen.directorate, { size: 10, center: true, after: 0 }));
-    if (cen.address) c1.push(k.para(cen.address, { size: 9, center: true, after: 0 }));
+    /* سطور بيانات المؤسسة من «هوية المؤسسة» (آخر سطر بخط عريض) كما في الورقة */
+    var idl = (cen.lines || []).filter(function (x) { return String(x || '').trim(); });
+    if (idl.length) idl.forEach(function (l, i) { c1.push(k.para(l, { size: i === idl.length - 1 ? 11 : 9.5, bold: i === idl.length - 1, center: true, after: 0 })); });
+    else {
+      c1.push(k.para(cen.name || '[اسم المؤسسة]', { bold: true, center: true, after: 0 }));
+      if (cen.directorate) c1.push(k.para(cen.directorate, { size: 10, center: true, after: 0 }));
+      if (cen.address) c1.push(k.para(cen.address, { size: 9, center: true, after: 0 }));
+    }
     var c2 = [k.para((exam.title || 'امتحان') + (exam.model ? ' — نموذج (' + exam.model + ')' : ''), { bold: true, size: 15, center: true, after: 20, color: '1F2A44' }),
       k.para('مادة ' + M.examSubject(exam), { bold: true, size: 13, center: true, after: 20 })];
     c2.push(k.para('العام الدراسي ' + (exam.year || M.S.settings.year), { size: 11, center: true, after: 0 }));
@@ -96,9 +104,22 @@
       k.para([k.run('تاريخ الإصدار: ', { bold: true, size: 9 }), k.run(M.fmtDate(doc.issueDate), { size: 9 })], { after: 0 }),
       k.para([k.run('رقم التعديل: ', { bold: true, size: 9 }), k.run(String(doc.revision || '00') + (doc.revisionDate ? ' — ' + M.fmtDate(doc.revisionDate) : ''), { size: 9 })], { after: 0 })
     ] : [k.para('—', { center: true })];
+    var G = M.secInfo(exam).groups, dots = '……………';
+    if (M.isTermPaper(exam)) {
+      /* امتحان رسمي: ترويسة واحدة + شريط بيانات، بلا بيانات الطالب */
+      c2 = [k.para((exam.title || 'امتحان'), { bold: true, size: 14, center: true, after: 0, color: '1F2A44' }), k.para('العام الدراسي ' + (exam.year || M.S.settings.year) + (exam.model ? ' — نموذج (' + exam.model + ')' : ''), { size: 10, center: true, after: 0 })];
+      var tOut = [k.table([[k.cell(c1, { w: 3300 }), k.cell(c2, { w: 3866 }), k.cell(c3, { w: 3300 })]], [3300, 3866, 3300])];
+      var flds = [['المادة', M.examSubject(exam)], ['الصف', exam.className]].concat(exam.specialization ? [['التخصص', exam.specialization]] : [])
+        .concat([['التاريخ', exam.examDate ? M.fmtDate(exam.examDate) : ''], ['الزمن', exam.duration], ['الدرجة الكلية', M.gradeWord(exam.totalGrade || M.examTotal(exam))], ['عدد الصفحات', exam._pageCount || '']]);
+      var fw = Math.floor(W / flds.length), fws = flds.map(function (x, i) { return i === flds.length - 1 ? W - fw * (flds.length - 1) : fw; });
+      tOut.push(k.table([flds.map(function (x, i) { return k.cell(x[0] + ': ' + (x[1] || dots), { w: fws[i], size: 10, center: true }); })], fws));
+      if (!M.isBooklet(exam) && exam.showGradeTable !== false && exam.sections.length) tOut.push(gradeTable(k, exam, G));
+      if (exam.showInstructions !== false && exam.instructions) tOut.push(k.para(exam.instructions, { before: 40, size: 11 }));
+      k.fix(false);
+      return tOut;
+    }
     var out = [k.table([[k.cell(c1, { w: 3300 }), k.cell(c2, { w: 3866 }), k.cell(c3, { w: 3300 })]], [3300, 3866, 3300])];
     out.push(k.para('', { after: 40 }));
-    var G = M.secInfo(exam).groups, dots = '……………';
     /* بيانات الطالب والورقة */
     if (exam.showStudent !== false) out.push(exam.showSeat !== false ? k.table([[k.cell('اسم الطالب: ' + '……………………………………………………', { w: 6966, size: 11 }), k.cell('رقم الجلوس: ' + '……………', { w: 3500, size: 11 })]], [6966, 3500]) : k.table([[k.cell('اسم الطالب: ' + '…………………………………………………………………………………', { w: 10466, size: 11 })]], [10466]));
     out.push(k.table([[
@@ -108,7 +129,13 @@
     out.push(k.table([[
       k.cell('الدرجة الكلية: ' + M.gradeWord(exam.totalGrade || M.examTotal(exam)), { w: 3488, size: 11 }),
       k.cell('عدد الأسئلة: ' + G.length, { w: 3489, size: 11 }), k.cell('عدد الصفحات: ' + (exam._pageCount || ''), { w: 3489, size: 11 })]], [3488, 3489, 3489]));
-    if (exam.showGradeTable !== false && exam.sections.length) {
+    if (!M.isBooklet(exam) && exam.showGradeTable !== false && exam.sections.length) out.push(gradeTable(k, exam, G));
+    if (exam.showInstructions !== false && exam.instructions) out.push(k.para(exam.instructions, { before: 60, size: 11 }));
+    k.fix(false);
+    return out;
+  }
+  function gradeTable(k, exam, G) {
+    {
       var n = G.length, cw = Math.floor((W - 1500) / (n + 1));
       var widths = [1500]; for (var i = 0; i <= n; i++) widths.push(cw);
       var r1 = [k.cell('السؤال', { w: 1500, bold: true, size: 10, shade: 'E5E9F2', center: true })], r2 = [k.cell('الدرجة', { w: 1500, bold: true, size: 10, center: true })], r3 = [k.cell('درجة الطالب', { w: 1500, bold: true, size: 10, center: true })];
@@ -120,11 +147,8 @@
       r1.push(k.cell('المجموع', { w: cw, bold: true, size: 10, shade: 'E5E9F2', center: true }));
       r2.push(k.cell(String(M.examTotal(exam)), { w: cw, bold: true, size: 10, center: true }));
       r3.push(k.cell('', { w: cw }));
-      out.push(k.table([r1, r2, r3], widths));
+      return k.table([r1, r2, r3], widths);
     }
-    if (exam.showInstructions !== false && exam.instructions) out.push(k.para(exam.instructions, { before: 60, size: 11 }));
-    k.fix(false);
-    return out;
   }
 
   function figPara(k, q, imgs) {
@@ -147,7 +171,7 @@
 
   function sectionBlocks(k, exam, sec, idx, imgs) {
     var d = k.d, out = [], L = exam.lang === 'en' ? M.EN_LETTERS : M.AR_LETTERS;
-    var title = sec.title || M.TYPE[sec.type].title, si = M.secInfo(exam), inf = si.info[idx];
+    var title = sec.title || M.TYPE[sec.type].title, si = M.secInfo(exam), inf = si.info[idx], BK = M.isBooklet(exam);
     if (!inf.hasParts) out.push(k.para([k.run('السؤال ' + M.ordinal(inf.main) + ': ', { bold: true, size: 13, color: '1F2A44' }), k.run(title, { bold: true, size: 13 }), k.run('   (' + M.gradeWord(M.sectionGrade(exam, sec)) + ')', { bold: true, size: 11 })], { before: 160, after: 80, bottomLine: true, keepNext: true }));
     else {
       var grp = si.groups[inf.main];
@@ -156,8 +180,8 @@
     }
     if (sec.passage) out.push(k.para(sec.passage, { after: 80, keepNext: true }));
     if (sec.type === 'tf') {
-      var rows = sec.items.map(function (it, i) { var q = M.itemQ(exam, it); return [k.cell(String(i + 1), { w: 600, center: true }), k.cell(blankify(q.text), { w: 8666 }), k.cell('(       )', { w: 1200, center: true })]; });
-      out.push(k.table(rows, [600, 8666, 1200]));
+      var rows = sec.items.map(function (it, i) { var q = M.itemQ(exam, it); return BK ? [k.cell(String(i + 1), { w: 600, center: true }), k.cell(blankify(q.text), { w: 9866 })] : [k.cell(String(i + 1), { w: 600, center: true }), k.cell(blankify(q.text), { w: 8666 }), k.cell('(       )', { w: 1200, center: true })]; });
+      out.push(k.table(rows, BK ? [600, 9866] : [600, 8666, 1200]));
       return out;
     }
     if (sec.type === 'match') {
@@ -185,7 +209,7 @@
         var order = M.mcqOrder(exam, sec, q), opts = order.map(function (j) { return q.options[j]; });
         var m = 0; opts.forEach(function (o) { m = Math.max(m, String(o).length); });
         var cols = m <= 10 ? 4 : (m <= 26 ? 2 : 1), cw = Math.floor((W - 400) / cols), rowsO = [], row = [];
-        opts.forEach(function (o, j) { row.push(k.cell('○ ' + L[j] + ') ' + o, { w: cw })); if (row.length === cols) { rowsO.push(row); row = []; } });
+        opts.forEach(function (o, j) { row.push(k.cell((BK ? '' : '○ ') + L[j] + ') ' + o, { w: cw })); if (row.length === cols) { rowsO.push(row); row = []; } });
         if (row.length) { while (row.length < cols) row.push(k.cell('', { w: cw })); rowsO.push(row); }
         var ws = []; for (var c = 0; c < cols; c++) ws.push(cw);
         out.push(k.table(rowsO, ws, { noBorder: true }));
@@ -198,11 +222,11 @@
         out.push(k.para(no + q.text));
         var im = imgs[q.id];
         if (im) out.push(new d.Paragraph({ children: [new d.ImageRun({ data: im.bytes, transformation: { width: im.w, height: im.h } })], alignment: d.AlignmentType.CENTER }));
-        out.push(k.table(q.labels.map(function (l) { return [k.cell(String(l.n), { w: 900, center: true }), k.cell('……………………………', { w: 4000 })]; }), [900, 4000]));
+        if (!BK) out.push(k.table(q.labels.map(function (l) { return [k.cell(String(l.n), { w: 900, center: true }), k.cell('……………………………', { w: 4000 })]; }), [900, 4000]));
       } else if (sec.type === 'draw') {
-        out = out.concat(withFig(k, q, imgs, [k.para(no + q.text)], [k.table([[k.cell('', { w: W })]], [W], { height: Math.round((Number(q.drawHeight) || 140) * 15) })]));
+        out = out.concat(withFig(k, q, imgs, [k.para(no + q.text)], BK ? [] : [k.table([[k.cell('', { w: W })]], [W], { height: Math.round((Number(q.drawHeight) || 140) * 15) })]));
       } else {
-        out = out.concat(withFig(k, q, imgs, [k.para(no + q.text, { after: 20 })], linesParas(k, Number(q.lines) || 0)));
+        out = out.concat(withFig(k, q, imgs, [k.para(no + q.text, { after: 20 })], linesParas(k, BK ? 0 : Number(q.lines) || 0)));
       }
     });
     return out;
@@ -238,7 +262,7 @@
       var kids = headerBlocks(k, exam, logo);
       exam.sections.forEach(function (sec, i) { kids = kids.concat(sectionBlocks(k, exam, sec, i, imgs)); });
       kids.push(k.para(exam.lang === 'en' ? 'End of questions' : 'انتهت الأسئلة', { bold: true, center: true, before: 200 }));
-      if (exam.showSign !== false) kids.push(k.table([[k.cell('توقيع المصحح', { w: 3488, center: true }), k.cell('توقيع المراجع', { w: 3489, center: true }), k.cell('رئيس اللجنة', { w: 3489, center: true })]], [3488, 3489, 3489], { noBorder: true }));
+      if (exam.showSign !== false && !M.isBooklet(exam)) kids.push(k.table([[k.cell('توقيع المصحح', { w: 3488, center: true }), k.cell('توقيع المراجع', { w: 3489, center: true }), k.cell('رئيس اللجنة', { w: 3489, center: true })]], [3488, 3489, 3489], { noBorder: true }));
       var doc = new k.d.Document({ creator: 'Exam Studio — Mohamed-Eldawly', title: exam.title || 'امتحان', styles: { default: { document: { run: { font: FONT, rightToLeft: true } } } },
         sections: [{ properties: pageProps(), footers: { default: footer(k, exam) }, children: kids }] });
       M.log('تصدير Word', exam.title + (exam.model ? ' — نموذج ' + exam.model : ''));

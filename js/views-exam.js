@@ -11,14 +11,30 @@
       docId: (M.docFor('exam') || {}).id || '', digits: S.settings.digits || 'arabic', lang: 'ar', paper: 'a4', fontSize: 14, styleVer: 2, typo: M.examDefaults().typo, fontPt: M.examDefaults().fontPt, color: '#1F2A44', compact: false, separator: 'none',
       showStudent: true, showGradeTable: true, showInstructions: true, showSign: true, instructions: 'أجب عن جميع الأسئلة في نفس الورقة.', shuffleOptions: false,
       sections: [], local: {}, mode: 'bank', examDate: '', footerNote: S.settings.footerNote != null ? S.settings.footerNote : 'مع أطيب التمنيات بالنجاح والتوفيق',
-      status: 'draft', model: '', groupId: '', scopeLessonIds: [], shuffleSeed: M.uid(), preparedBy: M.me().name || '' };
+      status: 'draft', model: '', groupId: '', scopeLessonIds: [], shuffleSeed: M.uid(), preparedBy: M.me().name || '',
+      paperKind: M.examDefaults().paperKind, answerIn: 'same', density: M.examDefaults().density };
   };
 
   M.EXAM_TITLES = EXAM_TITLES;
+  /* نوع الورقة: «class» اختبار عادي ببيانات الطالب · «term» امتحان نصف العام / آخر العام بلا بيانات الطالب
+     مكان الإجابة: «same» في نفس الورقة · «booklet» ورقة أسئلة فقط (كراسة إجابة منفصلة) */
+  M.INSTR_SAME = 'أجب عن جميع الأسئلة في نفس الورقة.';
+  M.INSTR_BOOK = 'أجب عن جميع الأسئلة في كراسة الإجابة.';
+  M.setPaperKind = function (e, kind, ans) {
+    if (kind) e.paperKind = kind === 'term' ? 'term' : 'class';
+    if (ans) {
+      e.answerIn = ans === 'booklet' ? 'booklet' : 'same';
+      var ins = String(e.instructions || '').trim();
+      if (e.answerIn === 'booklet' && (!ins || ins === M.INSTR_SAME)) e.instructions = M.INSTR_BOOK;
+      if (e.answerIn === 'same' && (!ins || ins === M.INSTR_BOOK)) e.instructions = M.INSTR_SAME;
+    }
+    return e;
+  };
   /* إعدادات الورقة الافتراضية من «هوية المؤسسة» */
   M.examDefaults = function () {
     var d = S.settings.examDefaults || {};
     return { theme: d.theme || 'classic', color: d.color || '#1F2A44', fontSize: d.fontSize || 14, duration: d.duration || 'ساعتان', className: d.className || '', specialization: d.specialization || '', itemSep: d.itemSep || 'space',
+      paperKind: d.paperKind === 'term' ? 'term' : 'class', density: d.density === 'normal' ? 'normal' : 'compact',
       typo: M.TYPO && M.TYPO[d.typo] ? d.typo : 'normal', fontPt: Number(d.fontPt) || (M.TYPO && M.TYPO[d.typo] ? M.TYPO[d.typo].pt : 14) };
   };
 
@@ -127,6 +143,9 @@
         card('copy', 'copy', 'من امتحان سابق', 'نفس التنسيق والأسئلة لتعدّل عليها، أو نفس الهيكل بأسئلة فارغة') + '</div>' +
         '<div id="nw-copy" style="display:none;margin-top:12px"><div class="grid2"><div class="field"><label for="nw-src">الامتحان المصدر</label><select id="nw-src" class="inp">' + prev.map(function (e) { return '<option value="' + e.id + '">' + esc((e.title || 'امتحان') + ' — ' + (M.examSubject(e) || '') + (e.className ? ' — ' + e.className : '')) + '</option>'; }).join('') + '</select></div>' +
         '<div class="field"><span class="lbl">الأسئلة</span><div class="seg" id="nw-cq"><button type="button" data-v="keep" class="on">انسخ الأسئلة</button><button type="button" data-v="empty">الهيكل فقط</button></div></div></div></div>' +
+        '<div id="nw-kind" class="grid2" style="margin-top:12px">' +
+        '<div class="field"><span class="lbl">نوع الورقة</span><div class="seg wrap" id="nw-pk"><button type="button" data-v="term"' + (D.paperKind === 'term' ? ' class="on"' : '') + '>امتحان نصف العام / آخر العام</button><button type="button" data-v="class"' + (D.paperKind !== 'term' ? ' class="on"' : '') + '>اختبار عادي ببيانات الطالب</button></div></div>' +
+        '<div class="field"><span class="lbl">مكان الإجابة</span><div class="seg wrap" id="nw-ai"><button type="button" data-v="same" class="on">في نفس الورقة</button><button type="button" data-v="booklet">أسئلة فقط (كراسة إجابة)</button></div></div></div>' +
         '<div id="nw-meta" class="grid2" style="margin-top:12px">' +
         '<div class="field"><label for="nw-t">اسم الامتحان</label><input id="nw-t" class="inp" list="nw-tl" value="' + esc(EXAM_TITLES[0]) + '"><datalist id="nw-tl">' + EXAM_TITLES.map(function (t) { return '<option value="' + esc(t) + '">'; }).join('') + '</datalist></div>' +
         '<div class="field"><label for="nw-sn">المادة</label><input id="nw-sn" class="inp" list="nw-sl" placeholder="مثال: الكهرباء العامة"><datalist id="nw-sl">' + uniq(S.exams.map(M.examSubject).concat(S.subjects.map(function (x) { return x.name; }))).map(function (t) { return '<option value="' + esc(t) + '">'; }).join('') + '</datalist></div>' +
@@ -134,11 +153,17 @@
         '<div class="field"><label for="nw-sp">التخصص</label><input id="nw-sp" class="inp" value="' + esc(D.specialization) + '"></div></div>',
       foot: '<button class="btn pri" data-ok>' + I('check') + ' ابدأ</button><button class="btn" data-x>إلغاء</button>',
       onMount: function (m, close) {
-        var cq = 'keep';
+        var cq = 'keep', pk = D.paperKind === 'term' ? 'term' : 'class', ai = 'same';
+        var TERM_T = [EXAM_TITLES[0], EXAM_TITLES[1], EXAM_TITLES[7]], CLASS_T = EXAM_TITLES.filter(function (t) { return TERM_T.indexOf(t) < 0; });
+        var tI = M.qs('#nw-t', m), tTouched = false; tI.oninput = function () { tTouched = true; };
+        if (pk === 'class') tI.value = CLASS_T[0];
+        M.qsa('#nw-pk button', m).forEach(function (b) { b.onclick = function () { pk = b.dataset.v; M.qsa('#nw-pk button', m).forEach(function (x) { x.classList.toggle('on', x === b); }); if (!tTouched) tI.value = pk === 'term' ? TERM_T[0] : CLASS_T[0]; }; });
+        M.qsa('#nw-ai button', m).forEach(function (b) { b.onclick = function () { ai = b.dataset.v; M.qsa('#nw-ai button', m).forEach(function (x) { x.classList.toggle('on', x === b); }); }; });
         var sync = function () {
           M.qsa('[data-mode]', m).forEach(function (b) { b.classList.toggle('on', b.dataset.mode === mode); });
           M.qs('#nw-copy', m).style.display = mode === 'copy' ? '' : 'none';
           M.qs('#nw-meta', m).style.display = mode === 'copy' && cq === 'keep' ? 'none' : '';
+          M.qs('#nw-kind', m).style.display = mode === 'copy' && cq === 'keep' ? 'none' : '';
         };
         M.qsa('[data-mode]', m).forEach(function (b) { b.onclick = function () { if (b.dataset.mode === 'copy' && !prev.length) return M.toast('لا توجد امتحانات سابقة بعد', 'bad'); mode = b.dataset.mode; sync(); }; });
         M.qsa('#nw-cq button', m).forEach(function (b) { b.onclick = function () { cq = b.dataset.v; M.qsa('#nw-cq button', m).forEach(function (x) { x.classList.toggle('on', x === b); }); sync(); }; });
@@ -148,13 +173,13 @@
           if (mode === 'copy') {
             var src = M.byId('exams', M.qs('#nw-src', m).value); if (!src) return;
             e = M.cloneExam(src, cq === 'empty');
-            if (cq === 'empty') { e.title = M.qs('#nw-t', m).value.trim() || src.title; e.subjectName = M.qs('#nw-sn', m).value.trim() || M.examSubject(src); e.subjectId = ''; e.className = M.qs('#nw-c', m).value.trim(); e.specialization = M.qs('#nw-sp', m).value.trim(); }
+            if (cq === 'empty') { M.setPaperKind(e, pk, ai); e.title = M.qs('#nw-t', m).value.trim() || src.title; e.subjectName = M.qs('#nw-sn', m).value.trim() || M.examSubject(src); e.subjectId = ''; e.className = M.qs('#nw-c', m).value.trim(); e.specialization = M.qs('#nw-sp', m).value.trim(); }
           } else {
             e = M.newExam(''); var D2 = M.examDefaults();
             e.mode = 'manual'; e.theme = D2.theme; e.color = D2.color; e.typo = D2.typo; e.fontPt = D2.fontPt; e.duration = D2.duration; e.itemSep = D2.itemSep;
             e.title = M.qs('#nw-t', m).value.trim() || e.title; e.subjectName = M.qs('#nw-sn', m).value.trim();
             e.className = M.qs('#nw-c', m).value.trim(); e.specialization = M.qs('#nw-sp', m).value.trim();
-            e.sections = [];
+            e.sections = []; e.density = D2.density; M.setPaperKind(e, pk, ai);
           }
           M.save('exams', e).then(function () { close(); M.go('#/studio/' + e.id + (mode === 'import' ? '?import=1' : '')); });
         };

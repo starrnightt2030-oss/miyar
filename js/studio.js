@@ -267,12 +267,13 @@
             '<div class="field"><span class="lbl">قوالب ملوّنة</span><div class="tpl-grid">' + M.TEMPLATES.filter(function (t) { return !t.bw; }).map(b).join('') + '</div></div>'; })() +
         (M.BW_THEMES.indexOf(e.theme) >= 0 ? '<div class="small muted">هذا القالب يطبع بالأسود دائماً — اللون يُستخدم في القوالب الملوّنة فقط.</div>' : '') +
         '<div class="field"><span class="lbl">اللون</span><div class="sw-row">' + M.ACCENTS.map(function (c) { return '<button type="button" class="swc' + ((e.color || '#1F2A44').toLowerCase() === c[0].toLowerCase() ? ' on' : '') + '" data-col="' + c[0] + '" style="background:' + c[0] + '" aria-label="' + c[1] + '"></button>'; }).join('') + '<label class="swc custom" aria-label="لون آخر"><input type="color" id="tp-col" value="' + esc(e.color || '#1F2A44') + '"></label></div></div>' +
+        field('المسافات', segHTML('tp-dn', [['compact', 'مضغوطة — موفرة للورق'], ['normal', 'عادية']], e.density === 'compact' ? 'compact' : 'normal')) +
         field('الفاصل بين الفروع', segHTML('tp-sep', SEPS, e.itemSep || 'space')) +
         typoHTML() +
         field('الأرقام', segHTML('tp-dg', [['arabic', '١٢٣'], ['english', '123']], e.digits || 'arabic')) +
         field('مقاس الورق', segHTML('tp-paper', [['a4', 'A4'], ['a3-booklet', 'A3 كتيّب'], ['a3-spread', 'A3 صفحتان']], e.paper || 'a4')) +
         field('لغة الورقة', segHTML('tp-lang', [['ar', 'عربي'], ['en', 'English']], e.lang || 'ar')) +
-        '<div class="sw-list">' + tg('boldText', 'خط عريض (Bold) للامتحان كله', false) + tg('showStudent', 'سطر اسم الطالب', true) + tg('showGradeTable', 'جدول الدرجات', true) + tg('showDoc', 'مربع وثيقة الجودة في الترويسة', true) + tg('showInstructions', 'سطر التعليمات', true) + tg('showSign', 'توقيعات المصحح والمراجع', true) + (M.typo(e).v2 ? '' : tg('compact', 'مسافات مضغوطة (صفحات أقل)', false) + tg('largePrint', 'طباعة مكبّرة (لضعاف البصر)', false)) + tg('shuffleOptions', 'خلط ترتيب الاختيارات', false) + '</div>' +
+        '<div class="sw-list">' + tg('boldText', 'خط عريض (Bold) للامتحان كله', false) + (M.isTermPaper(e) ? '' : tg('showStudent', 'سطر اسم الطالب', true)) + (M.isBooklet(e) ? '' : tg('showGradeTable', 'جدول الدرجات', true)) + tg('showDoc', 'مربع وثيقة الجودة في الترويسة', true) + tg('showInstructions', 'سطر التعليمات', true) + (M.isBooklet(e) ? '' : tg('showSign', 'توقيعات المصحح والمراجع', true)) + (M.typo(e).v2 ? '' : tg('compact', 'مسافات مضغوطة (صفحات أقل)', false) + tg('largePrint', 'طباعة مكبّرة (لضعاف البصر)', false)) + tg('shuffleOptions', 'خلط ترتيب الاختيارات', false) + '</div>' +
         '<button type="button" class="btn" id="tp-def">' + I('check', 16) + ' اجعل هذا التنسيق افتراضياً للامتحانات الجديدة</button></div>';
     }
     var thumbCache = {};
@@ -292,13 +293,19 @@
     function infoHTML() {
       var docs = S.docs.filter(function (d) { return d.type === 'exam'; });
       var inp = function (k, label, ph, type) { return field(label, '<input class="inp" data-ek="' + k + '"' + (type ? ' type="' + type + '"' : '') + ' value="' + esc(e[k] || '') + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : '') + '>'); };
-      return '<div class="ie"><div class="grid2">' +
+      var term = M.isTermPaper(e);
+      return '<div class="ie">' +
+        field('نوع الورقة', segHTML('in-pk', [['term', 'امتحان نصف العام / آخر العام'], ['class', 'اختبار عادي ببيانات الطالب']], term ? 'term' : 'class')) +
+        '<div class="small muted" style="margin-top:-4px">' + (term ? 'بدون اسم الطالب ورقم الجلوس: ترويسة واحدة فيها الشعار وبيانات المؤسسة ووثيقة الجودة، ثم سطر المادة والصف والتاريخ والزمن.' : 'فيها اسم الطالب ورقم الجلوس وبيانات الصف.') + '</div>' +
+        field('مكان الإجابة', segHTML('in-ai', [['same', 'في نفس الورقة'], ['booklet', 'ورقة أسئلة فقط (كراسة إجابة)']], M.isBooklet(e) ? 'booklet' : 'same')) +
+        (M.isBooklet(e) ? '<div class="small muted" style="margin-top:-4px">بدون سطور إجابة ولا مربعات رسم ولا دوائر الاختيار ولا أقواس صح/خطأ، وبدون جدول الدرجات والتوقيعات — الورقة أقصر.</div>' : '') +
+        '<div class="grid2">' +
         field('اسم الامتحان', '<input class="inp" data-ek="title" list="sd-tl" value="' + esc(e.title || '') + '"><datalist id="sd-tl">' + (M.EXAM_TITLES || []).map(function (t) { return '<option value="' + esc(t) + '">'; }).join('') + '</datalist>') +
         inp('subjectName', 'المادة', 'الكهرباء العامة') + inp('className', 'الصف الدراسي', 'الصف الأول') + inp('specialization', 'التخصص', 'كهرباء') +
         inp('duration', 'الزمن', 'ساعتان') + inp('examDate', 'التاريخ (فارغ = يُكتب باليد)', '', 'date') + inp('year', 'العام الدراسي', '') + inp('model', 'رمز النموذج', 'أ / ب') +
         field('الدرجة الكلية المطلوبة', '<input class="inp" data-en="totalGrade" inputmode="numeric" value="' + n(e.totalGrade || '') + '" placeholder="' + n(M.examTotal(e)) + '">') +
-        (e.showSeat !== false ? field('خانات رقم الجلوس', '<input class="inp" data-en="seatDigits" inputmode="numeric" value="' + n(e.seatDigits || 5) + '">') : '') + '</div>' +
-        '<label class="sw"><input type="checkbox" data-eb="showSeat" data-def="1"' + (e.showSeat !== false ? ' checked' : '') + '><span></span>رقم الجلوس <span class="small muted">— اقفله لاختبار الميدترم</span></label>' +
+        (!term && e.showSeat !== false ? field('خانات رقم الجلوس', '<input class="inp" data-en="seatDigits" inputmode="numeric" value="' + n(e.seatDigits || 5) + '">') : '') + '</div>' +
+        (term ? '' : '<label class="sw"><input type="checkbox" data-eb="showSeat" data-def="1"' + (e.showSeat !== false ? ' checked' : '') + '><span></span>رقم الجلوس <span class="small muted">— اقفله لاختبار الميدترم</span></label>') +
         field('سطر التعليمات', '<input class="inp" data-ek="instructions" value="' + esc(e.instructions || '') + '">') +
         field('جملة أسفل كل صفحة', '<input class="inp" data-ek="footerNote" value="' + esc(e.footerNote != null ? e.footerNote : 'مع أطيب التمنيات بالنجاح والتوفيق') + '">') +
         field('وثيقة الجودة في الترويسة', '<select class="inp" data-ek="docId"><option value="">— الافتراضية —</option>' + docs.map(function (d) { return '<option value="' + d.id + '"' + (d.id === e.docId ? ' selected' : '') + '>' + esc(d.name + ' (' + d.code + ' — إصدار ' + d.version + ')') + '</option>'; }).join('') + '</select>') +
@@ -414,13 +421,16 @@
       on('#sk-sep button', 'onclick', function (b) { sec(sel.s).sep = b.dataset.v; touch(true); });
       on('#sk-cols button', 'onclick', function (b) { sec(sel.s).optCols = b.dataset.v; touch(true); });
       on('#tp-sep button', 'onclick', function (b) { e.itemSep = b.dataset.v; touch(true); });
+      on('#tp-dn button', 'onclick', function (b) { e.density = b.dataset.v; touch(true); });
+      on('#in-pk button', 'onclick', function (b) { M.setPaperKind(e, b.dataset.v); touch(true); });
+      on('#in-ai button', 'onclick', function (b) { M.setPaperKind(e, null, b.dataset.v); touch(true); });
       on('#tp-dg button', 'onclick', function (b) { e.digits = b.dataset.v; touch(true); });
       on('#tp-paper button', 'onclick', function (b) { e.paper = b.dataset.v; touch(true); });
       on('#tp-lang button', 'onclick', function (b) { e.lang = b.dataset.v; touch(true); });
       on('[data-tpl]', 'onclick', function (b) { var wasBW = M.BW_THEMES.indexOf(e.theme) >= 0; e.theme = b.dataset.tpl; M.qsa('[data-tpl]', p).forEach(function (x) { x.classList.toggle('on', x === b); }); touch(wasBW !== (M.BW_THEMES.indexOf(e.theme) >= 0)); });
       on('[data-col]', 'onclick', function (b) { e.color = b.dataset.col; thumbCache = {}; touch(true); });
       var cc = M.qs('#tp-col', p); if (cc) cc.onchange = function () { e.color = cc.value; thumbCache = {}; touch(true); };
-      var td = M.qs('#tp-def', p); if (td) td.onclick = function () { M.setSetting('examDefaults', Object.assign({}, S.settings.examDefaults || {}, Object.assign({ theme: e.theme || 'classic', color: e.color, itemSep: e.itemSep || 'space' }, M.typo(e).v2 ? { typo: M.typo(e).typo, fontPt: M.typo(e).pt } : {}))).then(function () { M.toast('حُفظ كتنسيق افتراضي', 'ok'); }); };
+      var td = M.qs('#tp-def', p); if (td) td.onclick = function () { M.setSetting('examDefaults', Object.assign({}, S.settings.examDefaults || {}, Object.assign({ theme: e.theme || 'classic', color: e.color, itemSep: e.itemSep || 'space', density: e.density === 'compact' ? 'compact' : 'normal', paperKind: M.isTermPaper(e) ? 'term' : 'class' }, M.typo(e).v2 ? { typo: M.typo(e).typo, fontPt: M.typo(e).pt } : {}))).then(function () { M.toast('حُفظ كتنسيق افتراضي', 'ok'); }); };
       if (tab === 'tpl') drawThumbs();
       /* المتدرجات */
       stp(p, '#st-grade', function (v) { var q = curQ(); q.grade = Math.max(0, v); touch(); }, 0.5);
